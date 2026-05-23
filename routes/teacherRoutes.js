@@ -1,3 +1,4 @@
+const socketManager = require("../utils/socketManager");
 const express = require("express");
 const router = express.Router();
 
@@ -8,12 +9,58 @@ const Classroom = require("../models/classroomSchema");
 const ClassGroup = require("../models/classGroupSchema");
 const AttendanceSession = require("../models/attendanceSessionSchema");
 const AttendanceRecord = require("../models/attendanceRecordSchema");
+const AttendanceAttempt = require("../models/attendanceAttemptSchema");
+const Subject = require("../models/subjectSchema");
+
 
 const {
     getScheduleTimeStatus,
     getTodayRange,
     sortSchedulesByTime
 } = require("../utils/scheduleTime");
+
+function teacherGetDateInputValue(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+
+    return year + "-" + month + "-" + day;
+}
+
+function teacherGetStartOfDate(dateString) {
+    const date = dateString ? new Date(dateString + "T00:00:00") : new Date();
+    date.setHours(0, 0, 0, 0);
+    return date;
+}
+
+function teacherGetEndOfDate(dateString) {
+    const date = dateString ? new Date(dateString + "T23:59:59.999") : new Date();
+    date.setHours(23, 59, 59, 999);
+    return date;
+}
+
+function teacherGetPercent(part, total) {
+    if (!total || total <= 0) {
+        return 0;
+    }
+
+    return Math.round((part / total) * 100);
+}
+
+function teacherSafeObjectId(value) {
+    if (!value || value === "all") {
+        return null;
+    }
+
+    if (!value.match(/^[0-9a-fA-F]{24}$/)) {
+        return null;
+    }
+
+    return value;
+}
+
+
+
 
 function isTeacher(req, res, next) {
     if (!req.isAuthenticated()) {
@@ -305,6 +352,57 @@ router.get("/dashboard", isTeacher, async (req, res) => {
     }
 });
 
+router.get("/suspicious-attempts/recent", isTeacher, async function (req, res) {
+    try {
+        const teacherId = req.user._id || req.user.id;
+
+        const todayStart = new Date();
+        todayStart.setHours(0, 0, 0, 0);
+
+        const attempts = await AttendanceAttempt.find({
+            teacher: teacherId,
+            result: { $ne: "SUCCESS" },
+            createdAt: { $gte: todayStart }
+        })
+            .sort({ createdAt: -1 })
+            .limit(10)
+            .lean();
+
+        res.json({
+            success: true,
+            attempts: attempts.map(function (attempt) {
+                return {
+                    attemptId: attempt._id.toString(),
+                    sessionId: attempt.attendanceSession ? attempt.attendanceSession.toString() : "",
+                    scheduleId: attempt.schedule ? attempt.schedule.toString() : "",
+                    studentId: attempt.student ? attempt.student.toString() : "",
+                    studentName: attempt.studentName || "Unknown Student",
+                    enrollmentNumber: attempt.enrollmentNumber || "Unknown",
+                    reasonCode: attempt.reasonCode || "UNKNOWN",
+                    reasonMessage: attempt.reasonMessage || "Suspicious attendance attempt.",
+                    result: attempt.result || "REJECTED",
+                    distanceFromTeacher: Math.round(attempt.distanceFromTeacher || 0),
+                    allowedRadius: Math.round(attempt.allowedRadius || 0),
+                    gpsAccuracy: Math.round(attempt.gpsAccuracy || 0),
+                    maxAllowedAccuracy: Math.round(attempt.maxAllowedAccuracy || 100),
+                    createdAt: attempt.createdAt
+                };
+            })
+        });
+
+    } catch (err) {
+        console.log("TEACHER RECENT SUSPICIOUS ATTEMPTS ERROR:");
+        console.log(err.message);
+        console.log(err.stack);
+
+        res.status(500).json({
+            success: false,
+            message: "Unable to load suspicious attempts."
+        });
+    }
+});
+
+
 router.post("/attendance/start", isTeacher, async (req, res) => {
     try {
         const durationMinutes = Number(req.body.durationMinutes) || 5;
@@ -371,7 +469,7 @@ router.post("/attendance/start", isTeacher, async (req, res) => {
         const startTime = new Date();
         const endTime = new Date(Date.now() + durationMinutes * 60 * 1000);
 
-        await AttendanceSession.create({
+        const attendanceSession = await AttendanceSession.create({
             schedule: scheduleItem._id,
             teacher: req.user._id,
             subject: scheduleItem.subject._id,
@@ -388,6 +486,7 @@ router.post("/attendance/start", isTeacher, async (req, res) => {
             status: "ACTIVE",
             isActive: true
         });
+        socketManager.emitAttendanceStarted(attendanceSession, scheduleItem);
 
         res.redirect("/teacher/dashboard?message=live_started");
 
@@ -627,6 +726,7 @@ router.post("/attendance/end/:id", isTeacher, async (req, res) => {
         session.closedBy = req.user._id;
 
         await session.save();
+        socketManager.emitAttendanceEnded(session);
 
         res.redirect("/teacher/dashboard");
 
@@ -638,5 +738,295 @@ router.post("/attendance/end/:id", isTeacher, async (req, res) => {
         res.send("Could not end attendance: " + err.message);
     }
 });
+
+router.get("/reports", isTeacher, async function (req, res) {
+    try {
+        const teacherId = req.user._id || req.user.id;
+        const collegeId = req.user.college;
+
+        const todayInput = teacherGetDateInputValue(new Date());
+
+        const filters = {
+            fromDate: req.query.fromDate || todayInput,
+            toDate: req.query.toDate || todayInput,
+            classGroupId: req.query.classGroupId || "all",
+            subjectId: req.query.subjectId || "all",
+            status: req.query.status || "all"
+        };
+
+        const fromDate = teacherGetStartOfDate(filters.fromDate);
+        const toDate = teacherGetEndOfDate(filters.toDate);
+
+        const classGroupId = teacherSafeObjectId(filters.classGroupId);
+        const subjectId = teacherSafeObjectId(filters.subjectId);
+
+        const teacherSchedules = await Schedule.find({
+            college: collegeId,
+            teacher: teacherId
+        })
+            .populate("classGroup")
+            .populate("subject")
+            .sort({
+                day: 1,
+                startTime: 1
+            });
+
+        const classGroupIdMap = {};
+        const subjectIdMap = {};
+
+        teacherSchedules.forEach(function (schedule) {
+            if (schedule.classGroup) {
+                classGroupIdMap[schedule.classGroup._id.toString()] = true;
+            }
+
+            if (schedule.subject) {
+                subjectIdMap[schedule.subject._id.toString()] = true;
+            }
+        });
+
+        const classGroups = await ClassGroup.find({
+            _id: { $in: Object.keys(classGroupIdMap) },
+            college: collegeId
+        }).sort({
+            department: 1,
+            semester: 1,
+            section: 1
+        });
+
+        const subjects = await Subject.find({
+            _id: { $in: Object.keys(subjectIdMap) },
+            college: collegeId
+        })
+            .populate("classGroup")
+            .sort({
+                subjectName: 1
+            });
+
+        const sessionQuery = {
+            college: collegeId,
+            teacher: teacherId,
+            startTime: {
+                $gte: fromDate,
+                $lte: toDate
+            }
+        };
+
+        if (classGroupId) {
+            sessionQuery.classGroup = classGroupId;
+        }
+
+        if (subjectId) {
+            sessionQuery.subject = subjectId;
+        }
+
+        const sessions = await AttendanceSession.find(sessionQuery)
+            .populate("schedule")
+            .populate("subject")
+            .populate("teacher")
+            .populate("classGroup")
+            .populate("classroom")
+            .sort({
+                startTime: -1
+            });
+
+        const sessionIds = sessions.map(function (session) {
+            return session._id;
+        });
+
+        const recordQuery = {
+            college: collegeId,
+            attendanceSession: {
+                $in: sessionIds
+            }
+        };
+
+        if (filters.status !== "all") {
+            recordQuery.status = filters.status;
+        }
+
+        const attendanceRecords = await AttendanceRecord.find(recordQuery)
+            .populate("student")
+            .populate("subject")
+            .populate("classGroup")
+            .populate("classroom")
+            .populate({
+                path: "attendanceSession",
+                populate: [
+                    { path: "teacher" },
+                    { path: "schedule" },
+                    { path: "subject" },
+                    { path: "classGroup" },
+                    { path: "classroom" }
+                ]
+            })
+            .sort({
+                createdAt: -1
+            })
+            .limit(1000);
+
+        let totalPresent = 0;
+        let totalAbsent = 0;
+
+        const subjectSummaryMap = {};
+        const classSummaryMap = {};
+        const studentSummaryMap = {};
+
+        attendanceRecords.forEach(function (record) {
+            if (record.status === "PRESENT") {
+                totalPresent++;
+            }
+
+            if (record.status === "ABSENT") {
+                totalAbsent++;
+            }
+
+            const subjectKey = record.subject
+                ? record.subject._id.toString()
+                : "missing-subject";
+
+            if (!subjectSummaryMap[subjectKey]) {
+                subjectSummaryMap[subjectKey] = {
+                    name: record.subject ? record.subject.subjectName : "Subject Missing",
+                    code: record.subject && record.subject.subjectCode ? record.subject.subjectCode : "",
+                    total: 0,
+                    present: 0,
+                    absent: 0
+                };
+            }
+
+            subjectSummaryMap[subjectKey].total++;
+
+            if (record.status === "PRESENT") {
+                subjectSummaryMap[subjectKey].present++;
+            }
+
+            if (record.status === "ABSENT") {
+                subjectSummaryMap[subjectKey].absent++;
+            }
+
+            const classKey = record.classGroup
+                ? record.classGroup._id.toString()
+                : "missing-class";
+
+            if (!classSummaryMap[classKey]) {
+                classSummaryMap[classKey] = {
+                    name: record.classGroup ? record.classGroup.name : "Class Missing",
+                    total: 0,
+                    present: 0,
+                    absent: 0
+                };
+            }
+
+            classSummaryMap[classKey].total++;
+
+            if (record.status === "PRESENT") {
+                classSummaryMap[classKey].present++;
+            }
+
+            if (record.status === "ABSENT") {
+                classSummaryMap[classKey].absent++;
+            }
+
+            const studentKey = record.student
+                ? record.student._id.toString()
+                : "missing-student";
+
+            if (!studentSummaryMap[studentKey]) {
+                studentSummaryMap[studentKey] = {
+                    name: record.student ? record.student.fullName : "Student Missing",
+                    enrollmentNumber: record.student && record.student.enrollmentNumber ? record.student.enrollmentNumber : "",
+                    total: 0,
+                    present: 0,
+                    absent: 0
+                };
+            }
+
+            studentSummaryMap[studentKey].total++;
+
+            if (record.status === "PRESENT") {
+                studentSummaryMap[studentKey].present++;
+            }
+
+            if (record.status === "ABSENT") {
+                studentSummaryMap[studentKey].absent++;
+            }
+        });
+
+        const subjectSummary = Object.values(subjectSummaryMap).map(function (item) {
+            item.percentage = teacherGetPercent(item.present, item.total);
+            return item;
+        });
+
+        const classSummary = Object.values(classSummaryMap).map(function (item) {
+            item.percentage = teacherGetPercent(item.present, item.total);
+            return item;
+        });
+
+        const studentSummary = Object.values(studentSummaryMap).map(function (item) {
+            item.percentage = teacherGetPercent(item.present, item.total);
+            return item;
+        });
+
+        const attemptQuery = {
+            college: collegeId,
+            teacher: teacherId,
+            result: { $ne: "SUCCESS" },
+            createdAt: {
+                $gte: fromDate,
+                $lte: toDate
+            }
+        };
+
+        if (classGroupId) {
+            attemptQuery.classGroup = classGroupId;
+        }
+
+        if (subjectId) {
+            attemptQuery.subject = subjectId;
+        }
+
+        const suspiciousAttempts = await AttendanceAttempt.find(attemptQuery)
+            .populate("student")
+            .populate("subject")
+            .populate("classGroup")
+            .populate("classroom")
+            .sort({
+                createdAt: -1
+            })
+            .limit(50);
+
+        const summary = {
+            totalSessions: sessions.length,
+            totalRecords: attendanceRecords.length,
+            totalPresent: totalPresent,
+            totalAbsent: totalAbsent,
+            attendancePercentage: teacherGetPercent(totalPresent, attendanceRecords.length),
+            suspiciousCount: suspiciousAttempts.length
+        };
+
+        res.render("teacherReports", {
+            teacher: req.user,
+            activePage: "reports",
+            filters: filters,
+            classGroups: classGroups,
+            subjects: subjects,
+            sessions: sessions,
+            attendanceRecords: attendanceRecords,
+            suspiciousAttempts: suspiciousAttempts,
+            subjectSummary: subjectSummary,
+            classSummary: classSummary,
+            studentSummary: studentSummary,
+            summary: summary
+        });
+
+    } catch (err) {
+        console.log("TEACHER REPORTS ERROR:");
+        console.log(err.message);
+        console.log(err.stack);
+
+        res.status(500).send("Teacher reports error: " + err.message);
+    }
+});
+
 
 module.exports = router;

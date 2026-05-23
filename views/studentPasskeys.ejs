@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Passkeys | Student</title>
+
+    <link rel="stylesheet" href="/css/studentSchedule.css">
+
+    <link
+        rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
+    >
+</head>
+<body>
+
+<div class="student-layout">
+
+    <aside class="student-sidebar">
+        <div class="student-brand">
+            <i class="fa-solid fa-clipboard-check"></i>
+            <span>Attendify</span>
+        </div>
+
+        <nav class="student-nav">
+
+            <a href="/student/dashboard" class="<%= activePage === 'dashboard' ? 'active' : '' %>">
+                <i class="fa-solid fa-gauge"></i>
+                Dashboard
+            </a>
+
+            <a href="/student/schedule" class="<%= activePage === 'schedule' ? 'active' : '' %>">
+                <i class="fa-solid fa-calendar-days"></i>
+                Schedule
+            </a>
+
+            <a href="/student/attendance-history" class="<%= activePage === 'attendance-history' ? 'active' : '' %>">
+                <i class="fa-solid fa-chart-column"></i>
+                Attendance History
+            </a>
+
+            <a href="/student/passkeys" class="<%= activePage === 'passkeys' ? 'active' : '' %>">
+                <i class="fa-solid fa-fingerprint"></i>
+                Passkeys
+            </a>
+
+            <form action="/logout" method="POST" class="student-logout-form">
+                <button class="student-nav-logout" type="submit">
+                    <i class="fa-solid fa-right-from-bracket"></i>
+                    Logout
+                </button>
+            </form>
+
+        </nav>
+    </aside>
+
+    <main class="student-main">
+
+        <header class="student-header">
+            <div>
+                <span class="student-kicker">Student Panel</span>
+                <h1>Passkey Management</h1>
+                <p>Add or remove passkeys used for secure attendance marking.</p>
+            </div>
+        </header>
+
+        <div id="messageBox" class="schedule-message"></div>
+
+        <% if (message === "deleted") { %>
+            <div class="success-box">Passkey deleted successfully.</div>
+        <% } else if (message === "error") { %>
+            <div class="error-box">Something went wrong. Please try again.</div>
+        <% } else if (message === "invalid") { %>
+            <div class="error-box">Invalid passkey selected.</div>
+        <% } %>
+
+        <section class="student-passkey-hero">
+            <div>
+                <h3>Secure attendance with passkeys</h3>
+                <p>
+                    Passkeys use your device lock, fingerprint, Face ID, Touch ID or PIN.
+                    You can register multiple passkeys for your own devices.
+                </p>
+            </div>
+
+            <button class="view-btn live" type="button" id="registerPasskeyBtn">
+                <i class="fa-solid fa-fingerprint"></i>
+                Add New Passkey
+            </button>
+        </section>
+
+        <section class="student-history-summary-grid">
+
+            <article class="student-history-stat blue">
+                <div>
+                    <span>Total Passkeys</span>
+                    <strong><%= passkeys.length %></strong>
+                </div>
+                <i class="fa-solid fa-key"></i>
+            </article>
+
+            <article class="student-history-stat green">
+                <div>
+                    <span>Status</span>
+                    <strong><%= passkeys.length > 0 ? "Active" : "Setup" %></strong>
+                </div>
+                <i class="fa-solid fa-shield-halved"></i>
+            </article>
+
+        </section>
+
+        <section class="student-history-card">
+            <div class="student-history-card-head">
+                <div>
+                    <h3>Registered Passkeys</h3>
+                    <p>These passkeys can be used to verify attendance.</p>
+                </div>
+
+                <span class="student-count-pill">
+                    <%= passkeys.length %> Passkeys
+                </span>
+            </div>
+
+            <% if (!passkeys || passkeys.length === 0) { %>
+                <div class="student-history-empty">
+                    No passkey registered yet. Click “Add New Passkey” to set up secure attendance.
+                </div>
+            <% } else { %>
+
+                <div class="student-passkey-grid">
+
+                    <% passkeys.forEach(function(passkey, index) { %>
+                        <article class="student-passkey-card">
+
+                            <div class="student-passkey-top">
+                                <div class="student-passkey-icon">
+                                    <i class="fa-solid fa-fingerprint"></i>
+                                </div>
+
+                                <span class="student-passkey-badge">
+                                    Active
+                                </span>
+                            </div>
+
+                            <h4>
+                                <%= passkey.name || ("Passkey " + (index + 1)) %>
+                            </h4>
+
+                            <div class="student-passkey-meta">
+                                <p>
+                                    <i class="fa-solid fa-mobile-screen"></i>
+                                    Device Type:
+                                    <strong><%= passkey.deviceType || "Unknown" %></strong>
+                                </p>
+
+                                <p>
+                                    <i class="fa-solid fa-cloud"></i>
+                                    Backup:
+                                    <strong><%= passkey.backedUp ? "Yes" : "No" %></strong>
+                                </p>
+
+                                <p>
+                                    <i class="fa-solid fa-calendar-plus"></i>
+                                    Registered:
+                                    <strong>
+                                        <%= passkey.registeredAt ? new Date(passkey.registeredAt).toLocaleDateString() : "-" %>
+                                    </strong>
+                                </p>
+
+                                <p>
+                                    <i class="fa-solid fa-clock-rotate-left"></i>
+                                    Last Used:
+                                    <strong>
+                                        <%= passkey.lastUsedAt ? new Date(passkey.lastUsedAt).toLocaleString() : "Never" %>
+                                    </strong>
+                                </p>
+                            </div>
+
+                            <form
+                                action="/student/passkeys/<%= encodeURIComponent(passkey.credentialId) %>/delete"
+                                method="POST"
+                                onsubmit="return confirm('Delete this passkey? You may need another passkey to mark attendance.')"
+                            >
+                                <button class="student-delete-passkey-btn" type="submit">
+                                    <i class="fa-solid fa-trash"></i>
+                                    Delete Passkey
+                                </button>
+                            </form>
+
+                        </article>
+                    <% }) %>
+
+                </div>
+
+            <% } %>
+        </section>
+
+    </main>
+
+</div>
+
+<script src="https://unpkg.com/@simplewebauthn/browser/dist/bundle/index.umd.min.js"></script>
+<script src="/js/studentPasskey.js"></script>
+</body>
+</html>

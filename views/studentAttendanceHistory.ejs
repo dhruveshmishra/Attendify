@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Attendance History | Student</title>
+
+    <link rel="stylesheet" href="/css/studentSchedule.css">
+
+    <link
+        rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
+    >
+</head>
+<body>
+
+<div class="student-layout">
+
+    <aside class="student-sidebar">
+        <div class="student-brand">
+            <i class="fa-solid fa-clipboard-check"></i>
+            <span>Attendify</span>
+        </div>
+
+        <nav class="student-nav">
+
+            <a href="/student/dashboard" class="<%= activePage === 'dashboard' ? 'active' : '' %>">
+                <i class="fa-solid fa-gauge"></i>
+                Dashboard
+            </a>
+
+            <a href="/student/schedule" class="<%= activePage === 'schedule' ? 'active' : '' %>">
+                <i class="fa-solid fa-calendar-days"></i>
+                Schedule
+            </a>
+
+            <a href="/student/attendance-history" class="<%= activePage === 'attendance-history' ? 'active' : '' %>">
+                <i class="fa-solid fa-chart-column"></i>
+                Attendance History
+            </a>
+
+            <a href="/student/passkeys" class="<%= activePage === 'passkeys' ? 'active' : '' %>">
+                <i class="fa-solid fa-fingerprint"></i>
+                Passkeys
+            </a>
+
+            <form action="/logout" method="POST" class="student-logout-form">
+                <button class="student-nav-logout" type="submit">
+                    <i class="fa-solid fa-right-from-bracket"></i>
+                    Logout
+                </button>
+            </form>
+
+        </nav>
+    </aside>
+
+    <main class="student-main">
+
+        <header class="student-header">
+            <div>
+                <span class="student-kicker">Student Panel</span>
+                <h1>Attendance History</h1>
+                <p>View your attendance records, subject-wise summary and rejected attempts.</p>
+            </div>
+        </header>
+
+        <section class="student-history-profile-card">
+            <div>
+                <h3><%= student.fullName %></h3>
+                <p>
+                    <%= student.enrollmentNumber %>
+                    ·
+                    <%= student.classGroup ? student.classGroup.name : "Class Missing" %>
+                </p>
+            </div>
+
+            <span>
+                <i class="fa-solid fa-user-graduate"></i>
+                <%= summary.attendancePercentage %>% Overall
+            </span>
+        </section>
+
+        <section class="student-history-filter-card">
+            <div class="student-history-card-head">
+                <div>
+                    <h3>Filter Attendance</h3>
+                    <p>Select date range, subject or status.</p>
+                </div>
+            </div>
+
+            <form action="/student/attendance-history" method="GET" class="student-history-filter-grid">
+
+                <div class="student-field">
+                    <label>From Date</label>
+                    <input type="date" name="fromDate" value="<%= filters.fromDate %>" required>
+                </div>
+
+                <div class="student-field">
+                    <label>To Date</label>
+                    <input type="date" name="toDate" value="<%= filters.toDate %>" required>
+                </div>
+
+                <div class="student-field">
+                    <label>Subject</label>
+                    <select name="subjectId">
+                        <option value="all">All Subjects</option>
+
+                        <% subjects.forEach(function(subject) { %>
+                            <option
+                                value="<%= subject._id %>"
+                                <%= filters.subjectId === subject._id.toString() ? "selected" : "" %>
+                            >
+                                <%= subject.subjectName %>
+                                <% if (subject.subjectCode) { %>
+                                    - <%= subject.subjectCode %>
+                                <% } %>
+                            </option>
+                        <% }) %>
+                    </select>
+                </div>
+
+                <div class="student-field">
+                    <label>Status</label>
+                    <select name="status">
+                        <option value="all" <%= filters.status === "all" ? "selected" : "" %>>All</option>
+                        <option value="PRESENT" <%= filters.status === "PRESENT" ? "selected" : "" %>>Present</option>
+                        <option value="ABSENT" <%= filters.status === "ABSENT" ? "selected" : "" %>>Absent</option>
+                    </select>
+                </div>
+
+                <div class="student-field student-button-field">
+                    <label>&nbsp;</label>
+                    <button class="student-primary-btn" type="submit">
+                        <i class="fa-solid fa-filter"></i>
+                        Apply Filters
+                    </button>
+                </div>
+
+                <div class="student-field student-button-field">
+                    <label>&nbsp;</label>
+                    <a href="/student/attendance-history" class="student-secondary-btn">
+                        <i class="fa-solid fa-rotate-left"></i>
+                        Reset
+                    </a>
+                </div>
+
+            </form>
+        </section>
+
+        <section class="student-history-summary-grid">
+
+            <article class="student-history-stat blue">
+                <div>
+                    <span>Sessions</span>
+                    <strong><%= summary.totalSessions %></strong>
+                </div>
+                <i class="fa-solid fa-calendar-check"></i>
+            </article>
+
+            <article class="student-history-stat green">
+                <div>
+                    <span>Present</span>
+                    <strong><%= summary.totalPresent %></strong>
+                </div>
+                <i class="fa-solid fa-circle-check"></i>
+            </article>
+
+            <article class="student-history-stat red">
+                <div>
+                    <span>Absent</span>
+                    <strong><%= summary.totalAbsent %></strong>
+                </div>
+                <i class="fa-solid fa-circle-xmark"></i>
+            </article>
+
+            <article class="student-history-stat purple">
+                <div>
+                    <span>Attendance</span>
+                    <strong><%= summary.attendancePercentage %>%</strong>
+                </div>
+                <i class="fa-solid fa-chart-line"></i>
+            </article>
+
+            <article class="student-history-stat orange">
+                <div>
+                    <span>Rejected Attempts</span>
+                    <strong><%= summary.suspiciousCount %></strong>
+                </div>
+                <i class="fa-solid fa-triangle-exclamation"></i>
+            </article>
+
+        </section>
+
+        <section class="student-history-card">
+            <div class="student-history-card-head">
+                <div>
+                    <h3>Subject-wise Summary</h3>
+                    <p>Your attendance percentage by subject.</p>
+                </div>
+            </div>
+
+            <% if (!subjectSummary || subjectSummary.length === 0) { %>
+                <div class="student-history-empty">
+                    No subject-wise attendance found for selected filters.
+                </div>
+            <% } else { %>
+                <div class="student-history-table-wrap">
+                    <table class="student-history-table">
+                        <thead>
+                            <tr>
+                                <th>Subject</th>
+                                <th>Code</th>
+                                <th>Total</th>
+                                <th>Present</th>
+                                <th>Absent</th>
+                                <th>Attendance</th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+                            <% subjectSummary.forEach(function(item) { %>
+                                <tr>
+                                    <td><strong><%= item.name %></strong></td>
+                                    <td><%= item.code || "-" %></td>
+                                    <td><%= item.total %></td>
+                                    <td class="student-success"><%= item.present %></td>
+                                    <td class="student-danger"><%= item.absent %></td>
+                                    <td>
+                                        <span class="student-percent-pill <%= item.percentage >= 75 ? 'good' : 'bad' %>">
+                                            <%= item.percentage %>%
+                                        </span>
+                                    </td>
+                                </tr>
+                            <% }) %>
+                        </tbody>
+                    </table>
+                </div>
+            <% } %>
+        </section>
+
+        <section class="student-history-card">
+            <div class="student-history-card-head">
+                <div>
+                    <h3>Detailed Attendance Records</h3>
+                    <p>Latest 1000 records matching selected filters.</p>
+                </div>
+
+                <span class="student-count-pill">
+                    <%= attendanceRecords.length %> Records
+                </span>
+            </div>
+
+            <% if (!attendanceRecords || attendanceRecords.length === 0) { %>
+                <div class="student-history-empty">
+                    No attendance records found.
+                </div>
+            <% } else { %>
+                <div class="student-history-table-wrap">
+                    <table class="student-history-table">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Subject</th>
+                                <th>Teacher</th>
+                                <th>Classroom</th>
+                                <th>Status</th>
+                                <th>Method</th>
+                                <th>Distance</th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+                            <% attendanceRecords.forEach(function(record) { %>
+                                <%
+                                    const session = record.attendanceSession;
+                                    const teacher = session && session.teacher ? session.teacher : null;
+                                    const sessionDate = session && session.startTime ? session.startTime : record.createdAt;
+                                %>
+
+                                <tr>
+                                    <td>
+                                        <%= new Date(sessionDate).toLocaleDateString() %>
+                                        <br>
+                                        <small>
+                                            <%= new Date(sessionDate).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) %>
+                                        </small>
+                                    </td>
+
+                                    <td>
+                                        <strong>
+                                            <%= record.subject ? record.subject.subjectName : "Subject Missing" %>
+                                        </strong>
+                                        <br>
+                                        <small>
+                                            <%= record.subject && record.subject.subjectCode ? record.subject.subjectCode : "-" %>
+                                        </small>
+                                    </td>
+
+                                    <td>
+                                        <%= teacher ? teacher.fullName : "Teacher Missing" %>
+                                    </td>
+
+                                    <td>
+                                        <%= record.classroom ? record.classroom.classroomName : "Classroom Missing" %>
+                                    </td>
+
+                                    <td>
+                                        <span class="student-status <%= record.status === 'PRESENT' ? 'present' : 'absent' %>">
+                                            <%= record.status %>
+                                        </span>
+                                    </td>
+
+                                    <td>
+                                        <%= record.verificationMethod || "-" %>
+                                    </td>
+
+                                    <td>
+                                        <% if (record.distanceFromClassroom !== undefined && record.distanceFromClassroom !== null) { %>
+                                            <%= Math.round(record.distanceFromClassroom) %>m
+                                        <% } else { %>
+                                            -
+                                        <% } %>
+                                    </td>
+                                </tr>
+                            <% }) %>
+                        </tbody>
+                    </table>
+                </div>
+            <% } %>
+        </section>
+
+        <section class="student-history-card">
+            <div class="student-history-card-head">
+                <div>
+                    <h3>Rejected / Suspicious Attempts</h3>
+                    <p>Your failed attendance attempts for selected filters.</p>
+                </div>
+
+                <span class="student-count-pill danger">
+                    <%= suspiciousAttempts.length %> Attempts
+                </span>
+            </div>
+
+            <% if (!suspiciousAttempts || suspiciousAttempts.length === 0) { %>
+                <div class="student-history-empty">
+                    No rejected attempts found.
+                </div>
+            <% } else { %>
+                <div class="student-history-table-wrap">
+                    <table class="student-history-table">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Subject</th>
+                                <th>Reason</th>
+                                <th>Distance</th>
+                                <th>Radius</th>
+                                <th>GPS Accuracy</th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+                            <% suspiciousAttempts.forEach(function(attempt) { %>
+                                <tr>
+                                    <td>
+                                        <%= new Date(attempt.createdAt).toLocaleDateString() %>
+                                        <br>
+                                        <small>
+                                            <%= new Date(attempt.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) %>
+                                        </small>
+                                    </td>
+
+                                    <td>
+                                        <%= attempt.subject ? attempt.subject.subjectName : "Subject Missing" %>
+                                    </td>
+
+                                    <td>
+                                        <strong><%= attempt.reasonCode %></strong>
+                                        <br>
+                                        <small><%= attempt.reasonMessage %></small>
+                                    </td>
+
+                                    <td><%= Math.round(attempt.distanceFromTeacher || 0) %>m</td>
+                                    <td><%= Math.round(attempt.allowedRadius || 0) %>m</td>
+                                    <td><%= Math.round(attempt.gpsAccuracy || 0) %>m</td>
+                                </tr>
+                            <% }) %>
+                        </tbody>
+                    </table>
+                </div>
+            <% } %>
+        </section>
+
+    </main>
+
+</div>
+
+</body>
+</html>

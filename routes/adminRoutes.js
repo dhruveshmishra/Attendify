@@ -12,6 +12,7 @@ const Student = require("../models/studentSchema");
 const Schedule = require("../models/scheduleSchema");
 const AttendanceSession = require("../models/attendanceSessionSchema");
 const AttendanceRecord = require("../models/attendanceRecordSchema");
+const AttendanceAttempt = require("../models/attendanceAttemptSchema");
 
 
 const {
@@ -109,6 +110,10 @@ function getFlashMessage(code) {
     if (code === "delete_blocked") return "This record cannot be deleted safely.";
     if (code === "error") return "Something went wrong. Please try again.";
 
+    if (code === "passkeys_reset") {
+        return "Student passkeys reset successfully.";
+    }
+
     if (code === "updated") {
         return "Schedule updated successfully.";
     }
@@ -197,6 +202,20 @@ function csvEscape(value) {
     }
 
     return text;
+}
+
+function sendCsvResponse(res, filename, rows) {
+    const csvContent = rows.map(function (row) {
+        return row.map(csvEscape).join(",");
+    }).join("\n");
+
+    res.setHeader("Content-Type", "text/csv");
+    res.setHeader(
+        "Content-Disposition",
+        "attachment; filename=" + filename
+    );
+
+    res.send(csvContent);
 }
 
 function parseCsvLine(line) {
@@ -299,6 +318,664 @@ function getStudentImportResult(req) {
     req.session.studentImportResult = null;
     return result;
 }
+
+function getDateInputValue(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+
+    return year + "-" + month + "-" + day;
+}
+
+function getStartOfDate(dateString) {
+    const date = dateString ? new Date(dateString + "T00:00:00") : new Date();
+    date.setHours(0, 0, 0, 0);
+    return date;
+}
+
+function getEndOfDate(dateString) {
+    const date = dateString ? new Date(dateString + "T23:59:59.999") : new Date();
+    date.setHours(23, 59, 59, 999);
+    return date;
+}
+
+function getPercent(part, total) {
+    if (!total || total <= 0) {
+        return 0;
+    }
+
+    return Math.round((part / total) * 100);
+}
+
+function safeQueryObjectId(value) {
+    if (!value || value === "all") {
+        return null;
+    }
+
+    if (!isValidObjectId(value)) {
+        return null;
+    }
+
+    return value;
+}
+
+router.get("/reports", isCollegeAdmin, async function (req, res) {
+    try {
+        const collegeId = getCollegeId(req);
+
+        const todayInput = getDateInputValue(new Date());
+
+        const filters = {
+            fromDate: req.query.fromDate || todayInput,
+            toDate: req.query.toDate || todayInput,
+            classGroupId: req.query.classGroupId || "all",
+            subjectId: req.query.subjectId || "all",
+            teacherId: req.query.teacherId || "all",
+            studentId: req.query.studentId || "all",
+            status: req.query.status || "all"
+        };
+
+        const fromDate = getStartOfDate(filters.fromDate);
+        const toDate = getEndOfDate(filters.toDate);
+
+        const classGroupId = safeQueryObjectId(filters.classGroupId);
+        const subjectId = safeQueryObjectId(filters.subjectId);
+        const teacherId = safeQueryObjectId(filters.teacherId);
+        const studentId = safeQueryObjectId(filters.studentId);
+
+        const classGroups = await ClassGroup.find({
+            college: collegeId,
+            isActive: true
+        }).sort({
+            department: 1,
+            semester: 1,
+            section: 1
+        });
+
+        const subjects = await Subject.find({
+            college: collegeId,
+            isActive: true
+        })
+            .populate("classGroup")
+            .sort({
+                subjectName: 1
+            });
+
+        const teachers = await Teacher.find({
+            college: collegeId,
+            role: { $in: ["TEACHER", "HOD"] }
+        }).sort({
+            fullName: 1
+        });
+
+        const students = await Student.find({
+            college: collegeId
+        })
+            .populate("classGroup")
+            .sort({
+                fullName: 1
+            });
+
+        const sessionQuery = {
+            college: collegeId,
+            startTime: {
+                $gte: fromDate,
+                $lte: toDate
+            }
+        };
+
+        if (classGroupId) {
+            sessionQuery.classGroup = classGroupId;
+        }
+
+        if (subjectId) {
+            sessionQuery.subject = subjectId;
+        }
+
+        if (teacherId) {
+            sessionQuery.teacher = teacherId;
+        }
+
+        const sessions = await AttendanceSession.find(sessionQuery)
+            .populate("schedule")
+            .populate("subject")
+            .populate("teacher")
+            .populate("classGroup")
+            .populate("classroom")
+            .sort({
+                startTime: -1
+            });
+
+        const sessionIds = sessions.map(function (session) {
+            return session._id;
+        });
+
+        const recordQuery = {
+            college: collegeId,
+            attendanceSession: {
+                $in: sessionIds
+            }
+        };
+
+        if (studentId) {
+            recordQuery.student = studentId;
+        }
+
+        if (filters.status !== "all") {
+            recordQuery.status = filters.status;
+        }
+
+        const attendanceRecords = await AttendanceRecord.find(recordQuery)
+            .populate("student")
+            .populate("subject")
+            .populate("classGroup")
+            .populate("classroom")
+            .populate({
+                path: "attendanceSession",
+                populate: [
+                    { path: "teacher" },
+                    { path: "schedule" },
+                    { path: "subject" },
+                    { path: "classGroup" },
+                    { path: "classroom" }
+                ]
+            })
+            .sort({
+                createdAt: -1
+            })
+            .limit(1000);
+
+        let totalRecords = attendanceRecords.length;
+        let totalPresent = 0;
+        let totalAbsent = 0;
+
+        const subjectSummaryMap = {};
+        const classSummaryMap = {};
+        const studentSummaryMap = {};
+
+        attendanceRecords.forEach(function (record) {
+            const status = record.status;
+
+            if (status === "PRESENT") {
+                totalPresent++;
+            }
+
+            if (status === "ABSENT") {
+                totalAbsent++;
+            }
+
+            const subjectKey = record.subject
+                ? record.subject._id.toString()
+                : "missing-subject";
+
+            const subjectName = record.subject
+                ? record.subject.subjectName
+                : "Subject Missing";
+
+            if (!subjectSummaryMap[subjectKey]) {
+                subjectSummaryMap[subjectKey] = {
+                    name: subjectName,
+                    code: record.subject && record.subject.subjectCode ? record.subject.subjectCode : "",
+                    total: 0,
+                    present: 0,
+                    absent: 0
+                };
+            }
+
+            subjectSummaryMap[subjectKey].total++;
+
+            if (status === "PRESENT") {
+                subjectSummaryMap[subjectKey].present++;
+            }
+
+            if (status === "ABSENT") {
+                subjectSummaryMap[subjectKey].absent++;
+            }
+
+            const classKey = record.classGroup
+                ? record.classGroup._id.toString()
+                : "missing-class";
+
+            const className = record.classGroup
+                ? record.classGroup.name
+                : "Class Missing";
+
+            if (!classSummaryMap[classKey]) {
+                classSummaryMap[classKey] = {
+                    name: className,
+                    total: 0,
+                    present: 0,
+                    absent: 0
+                };
+            }
+
+            classSummaryMap[classKey].total++;
+
+            if (status === "PRESENT") {
+                classSummaryMap[classKey].present++;
+            }
+
+            if (status === "ABSENT") {
+                classSummaryMap[classKey].absent++;
+            }
+
+            const studentKey = record.student
+                ? record.student._id.toString()
+                : "missing-student";
+
+            const studentName = record.student
+                ? record.student.fullName
+                : "Student Missing";
+
+            const enrollmentNumber = record.student && record.student.enrollmentNumber
+                ? record.student.enrollmentNumber
+                : "";
+
+            if (!studentSummaryMap[studentKey]) {
+                studentSummaryMap[studentKey] = {
+                    name: studentName,
+                    enrollmentNumber: enrollmentNumber,
+                    total: 0,
+                    present: 0,
+                    absent: 0
+                };
+            }
+
+            studentSummaryMap[studentKey].total++;
+
+            if (status === "PRESENT") {
+                studentSummaryMap[studentKey].present++;
+            }
+
+            if (status === "ABSENT") {
+                studentSummaryMap[studentKey].absent++;
+            }
+        });
+
+        const subjectSummary = Object.values(subjectSummaryMap).map(function (item) {
+            item.percentage = getPercent(item.present, item.total);
+            return item;
+        });
+
+        const classSummary = Object.values(classSummaryMap).map(function (item) {
+            item.percentage = getPercent(item.present, item.total);
+            return item;
+        });
+
+        const studentSummary = Object.values(studentSummaryMap).map(function (item) {
+            item.percentage = getPercent(item.present, item.total);
+            return item;
+        }).slice(0, 10);
+
+        const attemptQuery = {
+            college: collegeId,
+            result: {
+                $ne: "SUCCESS"
+            },
+            createdAt: {
+                $gte: fromDate,
+                $lte: toDate
+            }
+        };
+
+        if (classGroupId) {
+            attemptQuery.classGroup = classGroupId;
+        }
+
+        if (subjectId) {
+            attemptQuery.subject = subjectId;
+        }
+
+        if (teacherId) {
+            attemptQuery.teacher = teacherId;
+        }
+
+        if (studentId) {
+            attemptQuery.student = studentId;
+        }
+
+        const suspiciousAttempts = await AttendanceAttempt.find(attemptQuery)
+            .sort({
+                createdAt: -1
+            })
+            .limit(50);
+
+        const summary = {
+            totalSessions: sessions.length,
+            totalRecords: totalRecords,
+            totalPresent: totalPresent,
+            totalAbsent: totalAbsent,
+            attendancePercentage: getPercent(totalPresent, totalRecords),
+            suspiciousCount: suspiciousAttempts.length
+        };
+
+        res.render("admin/reports", {
+            admin: req.user,
+            activePage: "reports",
+            filters: filters,
+            classGroups: classGroups,
+            subjects: subjects,
+            teachers: teachers,
+            students: students,
+            sessions: sessions,
+            attendanceRecords: attendanceRecords,
+            suspiciousAttempts: suspiciousAttempts,
+            subjectSummary: subjectSummary,
+            classSummary: classSummary,
+            studentSummary: studentSummary,
+            summary: summary,
+            message: null
+        });
+
+    } catch (err) {
+        console.log("ADMIN REPORTS PAGE ERROR:");
+        console.log(err.message);
+        console.log(err.stack);
+
+        res.status(500).send("Admin reports page error: " + err.message);
+    }
+});
+
+router.get("/reports/export-attendance", isCollegeAdmin, async function (req, res) {
+    try {
+        const collegeId = getCollegeId(req);
+
+        const todayInput = getDateInputValue(new Date());
+
+        const filters = {
+            fromDate: req.query.fromDate || todayInput,
+            toDate: req.query.toDate || todayInput,
+            classGroupId: req.query.classGroupId || "all",
+            subjectId: req.query.subjectId || "all",
+            teacherId: req.query.teacherId || "all",
+            studentId: req.query.studentId || "all",
+            status: req.query.status || "all"
+        };
+
+        const fromDate = getStartOfDate(filters.fromDate);
+        const toDate = getEndOfDate(filters.toDate);
+
+        const classGroupId = safeQueryObjectId(filters.classGroupId);
+        const subjectId = safeQueryObjectId(filters.subjectId);
+        const teacherId = safeQueryObjectId(filters.teacherId);
+        const studentId = safeQueryObjectId(filters.studentId);
+
+        const sessionQuery = {
+            college: collegeId,
+            startTime: {
+                $gte: fromDate,
+                $lte: toDate
+            }
+        };
+
+        if (classGroupId) {
+            sessionQuery.classGroup = classGroupId;
+        }
+
+        if (subjectId) {
+            sessionQuery.subject = subjectId;
+        }
+
+        if (teacherId) {
+            sessionQuery.teacher = teacherId;
+        }
+
+        const sessions = await AttendanceSession.find(sessionQuery).select("_id");
+
+        const sessionIds = sessions.map(function (session) {
+            return session._id;
+        });
+
+        const recordQuery = {
+            college: collegeId,
+            attendanceSession: {
+                $in: sessionIds
+            }
+        };
+
+        if (studentId) {
+            recordQuery.student = studentId;
+        }
+
+        if (filters.status !== "all") {
+            recordQuery.status = filters.status;
+        }
+
+        const attendanceRecords = await AttendanceRecord.find(recordQuery)
+            .populate("student")
+            .populate("subject")
+            .populate("classGroup")
+            .populate("classroom")
+            .populate({
+                path: "attendanceSession",
+                populate: [
+                    { path: "teacher" },
+                    { path: "schedule" },
+                    { path: "subject" },
+                    { path: "classGroup" },
+                    { path: "classroom" }
+                ]
+            })
+            .sort({
+                createdAt: -1
+            });
+
+        const rows = [];
+
+        rows.push([
+            "Date",
+            "Time",
+            "Student Name",
+            "Enrollment Number",
+            "Student Email",
+            "Class Group",
+            "Subject",
+            "Subject Code",
+            "Teacher",
+            "Classroom",
+            "Status",
+            "Verification Method",
+            "Distance From Teacher/Classroom (m)",
+            "GPS Accuracy (m)",
+            "Marked At"
+        ]);
+
+        attendanceRecords.forEach(function (record) {
+            const session = record.attendanceSession;
+            const sessionDate = session && session.startTime ? session.startTime : record.createdAt;
+            const teacher = session && session.teacher ? session.teacher : null;
+
+            rows.push([
+                sessionDate ? new Date(sessionDate).toLocaleDateString() : "",
+                sessionDate ? new Date(sessionDate).toLocaleTimeString([], {
+                    hour: "2-digit",
+                    minute: "2-digit"
+                }) : "",
+
+                record.student ? record.student.fullName : "Student Missing",
+                record.student && record.student.enrollmentNumber ? record.student.enrollmentNumber : "",
+                record.student && record.student.email ? record.student.email : "",
+
+                record.classGroup ? record.classGroup.name : "",
+                record.subject ? record.subject.subjectName : "",
+                record.subject && record.subject.subjectCode ? record.subject.subjectCode : "",
+
+                teacher ? teacher.fullName : "",
+
+                record.classroom ? record.classroom.classroomName : "",
+
+                record.status || "",
+                record.verificationMethod || "",
+
+                record.distanceFromClassroom !== undefined && record.distanceFromClassroom !== null
+                    ? Math.round(record.distanceFromClassroom)
+                    : "",
+
+                record.deviceInfo && record.deviceInfo.gpsAccuracy
+                    ? Math.round(record.deviceInfo.gpsAccuracy)
+                    : "",
+
+                record.createdAt ? new Date(record.createdAt).toLocaleString() : ""
+            ]);
+        });
+
+        const filename =
+            "attendance-report-" +
+            filters.fromDate +
+            "-to-" +
+            filters.toDate +
+            ".csv";
+
+        sendCsvResponse(res, filename, rows);
+
+    } catch (err) {
+        console.log("ADMIN EXPORT ATTENDANCE REPORT ERROR:");
+        console.log(err.message);
+        console.log(err.stack);
+
+        res.redirect("/admin/reports");
+    }
+});
+
+router.get("/reports/export-suspicious", isCollegeAdmin, async function (req, res) {
+    try {
+        const collegeId = getCollegeId(req);
+
+        const todayInput = getDateInputValue(new Date());
+
+        const filters = {
+            fromDate: req.query.fromDate || todayInput,
+            toDate: req.query.toDate || todayInput,
+            classGroupId: req.query.classGroupId || "all",
+            subjectId: req.query.subjectId || "all",
+            teacherId: req.query.teacherId || "all",
+            studentId: req.query.studentId || "all"
+        };
+
+        const fromDate = getStartOfDate(filters.fromDate);
+        const toDate = getEndOfDate(filters.toDate);
+
+        const classGroupId = safeQueryObjectId(filters.classGroupId);
+        const subjectId = safeQueryObjectId(filters.subjectId);
+        const teacherId = safeQueryObjectId(filters.teacherId);
+        const studentId = safeQueryObjectId(filters.studentId);
+
+        const attemptQuery = {
+            college: collegeId,
+            result: {
+                $ne: "SUCCESS"
+            },
+            createdAt: {
+                $gte: fromDate,
+                $lte: toDate
+            }
+        };
+
+        if (classGroupId) {
+            attemptQuery.classGroup = classGroupId;
+        }
+
+        if (subjectId) {
+            attemptQuery.subject = subjectId;
+        }
+
+        if (teacherId) {
+            attemptQuery.teacher = teacherId;
+        }
+
+        if (studentId) {
+            attemptQuery.student = studentId;
+        }
+
+        const suspiciousAttempts = await AttendanceAttempt.find(attemptQuery)
+            .populate("student")
+            .populate("attendanceSession")
+            .populate("subject")
+            .populate("teacher")
+            .populate("classGroup")
+            .populate("classroom")
+            .sort({
+                createdAt: -1
+            });
+
+        const rows = [];
+
+        rows.push([
+            "Date",
+            "Time",
+            "Student Name",
+            "Enrollment Number",
+            "Class Group",
+            "Subject",
+            "Teacher",
+            "Classroom",
+            "Result",
+            "Reason Code",
+            "Reason Message",
+            "Distance From Teacher (m)",
+            "Allowed Radius (m)",
+            "GPS Accuracy (m)",
+            "Max Allowed Accuracy (m)",
+            "Student Latitude",
+            "Student Longitude",
+            "Teacher Latitude",
+            "Teacher Longitude",
+            "IP Address",
+            "User Agent"
+        ]);
+
+        suspiciousAttempts.forEach(function (attempt) {
+            rows.push([
+                attempt.createdAt ? new Date(attempt.createdAt).toLocaleDateString() : "",
+                attempt.createdAt ? new Date(attempt.createdAt).toLocaleTimeString([], {
+                    hour: "2-digit",
+                    minute: "2-digit"
+                }) : "",
+
+                attempt.studentName || (attempt.student ? attempt.student.fullName : ""),
+                attempt.enrollmentNumber || (attempt.student ? attempt.student.enrollmentNumber : ""),
+
+                attempt.classGroup ? attempt.classGroup.name : "",
+                attempt.subject ? attempt.subject.subjectName : "",
+                attempt.teacher ? attempt.teacher.fullName : "",
+                attempt.classroom ? attempt.classroom.classroomName : "",
+
+                attempt.result || "",
+                attempt.reasonCode || "",
+                attempt.reasonMessage || "",
+
+                Math.round(attempt.distanceFromTeacher || 0),
+                Math.round(attempt.allowedRadius || 0),
+                Math.round(attempt.gpsAccuracy || 0),
+                Math.round(attempt.maxAllowedAccuracy || 0),
+
+                attempt.studentLatitude || "",
+                attempt.studentLongitude || "",
+                attempt.teacherLatitude || "",
+                attempt.teacherLongitude || "",
+
+                attempt.ip || "",
+                attempt.userAgent || ""
+            ]);
+        });
+
+        const filename =
+            "suspicious-attendance-attempts-" +
+            filters.fromDate +
+            "-to-" +
+            filters.toDate +
+            ".csv";
+
+        sendCsvResponse(res, filename, rows);
+
+    } catch (err) {
+        console.log("ADMIN EXPORT SUSPICIOUS ATTEMPTS ERROR:");
+        console.log(err.message);
+        console.log(err.stack);
+
+        res.redirect("/admin/reports");
+    }
+});
 
 
 router.get("/login", function (req, res) {
@@ -1883,6 +2560,47 @@ router.post("/students/:id/update", isCollegeAdmin, async function (req, res) {
 
     } catch (err) {
         console.log("ADMIN UPDATE STUDENT ERROR:");
+        console.log(err.message);
+        console.log(err.stack);
+
+        res.redirect("/admin/students?message=error");
+    }
+});
+
+router.post("/students/:id/reset-passkeys", isCollegeAdmin, async function (req, res) {
+    try {
+        const collegeId = getCollegeId(req);
+        const studentId = req.params.id;
+
+        if (!isValidObjectId(studentId)) {
+            return res.redirect("/admin/students?message=invalid_id");
+        }
+
+        const student = await Student.findOne({
+            _id: studentId,
+            college: collegeId
+        });
+
+        if (!student) {
+            return res.redirect("/admin/students?message=invalid_id");
+        }
+
+        await Student.updateOne(
+            {
+                _id: studentId,
+                college: collegeId
+            },
+            {
+                $set: {
+                    passkeys: []
+                }
+            }
+        );
+
+        res.redirect("/admin/students?message=passkeys_reset");
+
+    } catch (err) {
+        console.log("ADMIN RESET STUDENT PASSKEYS ERROR:");
         console.log(err.message);
         console.log(err.stack);
 

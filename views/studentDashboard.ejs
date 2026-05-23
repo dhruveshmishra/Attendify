@@ -6,7 +6,6 @@
     <title>Student Dashboard | Attendify</title>
 
     <link rel="stylesheet" href="/css/studentSchedule.css">
-
     <link
         rel="stylesheet"
         href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
@@ -53,36 +52,39 @@
         </div>
 
         <nav class="sidebar-menu">
-            <a href="/student/dashboard" class="menu-item active">
+
+            <a
+                href="/student/dashboard"
+                class="menu-item <%= activePage === 'dashboard' ? 'active' : '' %>"
+            >
                 <i class="fa-solid fa-house"></i>
                 <span>Home</span>
             </a>
 
-            <a href="/student/schedule" class="menu-item">
+            <a
+                href="/student/schedule"
+                class="menu-item <%= activePage === 'schedule' ? 'active' : '' %>"
+            >
                 <i class="fa-solid fa-calendar-days"></i>
                 <span>Schedule</span>
             </a>
 
-            <a href="#" class="menu-item">
-                <i class="fa-solid fa-users"></i>
-                <span>Community</span>
+            <a
+                href="/student/attendance-history"
+                class="menu-item <%= activePage === 'attendance-history' ? 'active' : '' %>"
+            >
+                <i class="fa-solid fa-chart-column"></i>
+                <span>Attendance History</span>
             </a>
 
-            <a href="/student/dashboard" class="menu-item">
-                <i class="fa-solid fa-chart-simple"></i>
-                <span>My Attendance</span>
+            <a
+                href="/student/passkeys"
+                class="menu-item <%= activePage === 'passkeys' ? 'active' : '' %>"
+            >
+                <i class="fa-solid fa-fingerprint"></i>
+                <span>Passkeys</span>
             </a>
 
-            <a href="#" class="menu-item">
-                <i class="fa-solid fa-credit-card"></i>
-                <span>Fee Payment</span>
-                <b></b>
-            </a>
-
-            <a href="#" class="menu-item">
-                <i class="fa-solid fa-book-open"></i>
-                <span>My Courses</span>
-            </a>
         </nav>
 
         <div class="academy-link">
@@ -205,6 +207,29 @@
 
             <div id="messageBox" class="schedule-message"></div>
 
+            <section class="passkey-security-card">
+                <div>
+                    <h3>Passkey Security</h3>
+                    <% if (hasPasskey) { %>
+                        <p id="passkeyStatusText">Passkey active</p>
+                    <% } else { %>
+                        <p id="passkeyStatusText">Set up your passkey before marking attendance.</p>
+                    <% } %>
+                </div>
+
+                <% if (hasPasskey) { %>
+                    <button class="view-btn marked" type="button" disabled>
+                        <i class="fa-solid fa-shield-halved"></i>
+                        Passkey Active
+                    </button>
+                <% } else { %>
+                    <button class="view-btn live" type="button" id="registerPasskeyBtn">
+                        <i class="fa-solid fa-fingerprint"></i>
+                        Set Up Passkey
+                    </button>
+                <% } %>
+            </section>
+
             <% if (scheduleList.length === 0) { %>
                 <div class="empty-schedule">
                     <div>
@@ -257,7 +282,26 @@
                         }
                     %>
 
-                    <article class="dashboard-class-card">
+                    <%
+                        let cardState = "waiting";
+                        let cardSessionId = "";
+
+                        if (attendanceInfo && attendanceInfo.status === "PRESENT") {
+                            cardState = "present";
+                        } else if (attendanceInfo && attendanceInfo.status === "ABSENT") {
+                            cardState = "absent";
+                        } else if (activeSession) {
+                            cardState = "live";
+                            cardSessionId = activeSession._id.toString();
+                        }
+                    %>
+
+                        <article
+                            class="dashboard-class-card"
+                            data-schedule-id="<%= item._id %>"
+                            data-session-id="<%= cardSessionId %>"
+                            data-attendance-state="<%= cardState %>"
+                        >
 
                         <div class="dashboard-class-left">
                             <div class="class-dot">
@@ -296,7 +340,7 @@
                             </div>
                         </div>
 
-                        <div class="dashboard-class-action">
+                        <div class="dashboard-class-action js-schedule-action">
 
                             <% if (attendanceInfo && attendanceInfo.status === "PRESENT") { %>
 
@@ -432,5 +476,11 @@
 </div>
 
 </body>
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="https://unpkg.com/@simplewebauthn/browser/dist/bundle/index.umd.min.js"></script>
+<script src="/js/studentPasskey.js"></script>
 <script src="/js/studentLocation.js"></script>
+<script src="/js/studentRealtime.js"></script>
+
 </html>

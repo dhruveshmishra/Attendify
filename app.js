@@ -26,11 +26,14 @@ app.use(express.json());
 
 app.use(express.static(path.join(__dirname, "public")));
 
-app.use(session({
+const sessionMiddleware = session({
     secret: "attendance-secret-key",
     resave: false,
     saveUninitialized: false
-}));
+});
+
+app.set("sessionMiddleware", sessionMiddleware);
+app.use(sessionMiddleware);
 
 app.use(passport.initialize());
 app.use(passport.session());

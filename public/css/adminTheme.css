@@ -1141,6 +1141,300 @@ button[disabled] {
 }
 
 
+/* ================= ADMIN REPORTS PAGE ================= */
+
+.report-filter-card {
+    margin-bottom: 24px;
+}
+
+.reports-filter-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.reports-reset-btn {
+    height: 54px;
+    width: 100%;
+}
+
+.reports-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.report-stat-card {
+    padding: 20px;
+    border-radius: 24px;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 14px 38px rgba(15, 23, 42, 0.07);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+}
+
+.report-stat-card span {
+    display: block;
+    color: #64748b;
+    font-size: 13px;
+    font-weight: 900;
+}
+
+.report-stat-card strong {
+    display: block;
+    margin-top: 8px;
+    color: #0f172a;
+    font-size: 30px;
+    font-weight: 950;
+    letter-spacing: -0.05em;
+}
+
+.report-stat-card i {
+    width: 50px;
+    height: 50px;
+    border-radius: 18px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+}
+
+.report-stat-card.blue i {
+    background: #dbeafe;
+    color: #2563eb;
+}
+
+.report-stat-card.green i {
+    background: #dcfce7;
+    color: #16a34a;
+}
+
+.report-stat-card.red i {
+    background: #fee2e2;
+    color: #dc2626;
+}
+
+.report-stat-card.purple i {
+    background: #ede9fe;
+    color: #7c3aed;
+}
+
+.report-stat-card.orange i {
+    background: #ffedd5;
+    color: #f97316;
+}
+
+.report-table-wrap {
+    width: 100%;
+    overflow-x: auto;
+}
+
+.report-table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 880px;
+}
+
+.report-table thead {
+    background: #f8fafc;
+}
+
+.report-table th {
+    padding: 14px 14px;
+    color: #64748b;
+    font-size: 12px;
+    font-weight: 950;
+    text-transform: uppercase;
+    text-align: left;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.report-table td {
+    padding: 15px 14px;
+    color: #334155;
+    font-size: 14px;
+    font-weight: 750;
+    border-bottom: 1px solid #edf2f7;
+    vertical-align: middle;
+}
+
+.report-table td strong {
+    color: #0f172a;
+    font-weight: 950;
+}
+
+.report-table td small {
+    color: #64748b;
+    font-size: 12px;
+    font-weight: 800;
+}
+
+.text-success {
+    color: #15803d !important;
+    font-weight: 950 !important;
+}
+
+.text-danger {
+    color: #b91c1c !important;
+    font-weight: 950 !important;
+}
+
+.report-percent-pill {
+    padding: 7px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 950;
+    display: inline-flex;
+}
+
+.report-percent-pill.good {
+    background: #dcfce7;
+    color: #15803d;
+}
+
+.report-percent-pill.bad {
+    background: #fee2e2;
+    color: #b91c1c;
+}
+
+.report-status {
+    padding: 7px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 950;
+    display: inline-flex;
+}
+
+.report-status.present {
+    background: #dcfce7;
+    color: #15803d;
+}
+
+.report-status.absent {
+    background: #fee2e2;
+    color: #b91c1c;
+}
+
+.admin-count-pill.danger {
+    background: #fee2e2;
+    color: #b91c1c;
+}
+
+/* ================= REPORT EXPORT BUTTONS ================= */
+
+.report-export-card {
+    margin-bottom: 24px;
+}
+
+.report-export-content {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+}
+
+.report-export-content h3 {
+    margin: 0;
+    color: #0f172a;
+    font-size: 20px;
+    font-weight: 950;
+}
+
+.report-export-content p {
+    margin: 6px 0 0;
+    color: #64748b;
+    font-size: 14px;
+    font-weight: 800;
+}
+
+.report-export-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.admin-secondary-btn.danger {
+    background: #fee2e2;
+    color: #b91c1c;
+    border-color: #fecaca;
+}
+
+.admin-secondary-btn.danger:hover {
+    background: #fecaca;
+}
+
+
+/* ================= ADMIN PASSKEY BUTTONS ================= */
+
+.admin-badge.success {
+    background: #dcfce7;
+    color: #15803d;
+}
+
+.admin-badge.danger {
+    background: #fee2e2;
+    color: #b91c1c;
+}
+
+.admin-warning-btn {
+    min-height: 38px;
+    padding: 0 12px;
+    border: none;
+    border-radius: 12px;
+    background: #ffedd5;
+    color: #c2410c;
+    font-size: 13px;
+    font-weight: 950;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.admin-warning-btn:hover {
+    background: #fed7aa;
+}
+
+
+@media (max-width: 760px) {
+    .report-export-content {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .report-export-actions {
+        flex-direction: column;
+    }
+
+    .report-export-actions .admin-secondary-btn {
+        width: 100%;
+    }
+}
+
+
+
+@media (max-width: 1200px) {
+    .reports-summary-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .reports-filter-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 760px) {
+    .reports-summary-grid,
+    .reports-filter-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+
 @media (max-width: 1100px) {
     .subject-form {
         grid-template-columns: repeat(2, minmax(0, 1fr));

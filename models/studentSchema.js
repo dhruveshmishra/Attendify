@@ -1,6 +1,54 @@
 const mongoose = require("mongoose");
 const bcrypt = require("bcrypt");
 
+
+const studentPasskeySchema = new mongoose.Schema(
+    {
+        credentialId: {
+            type: String,
+            required: true
+        },
+
+        credentialPublicKey: {
+            type: Buffer,
+            required: true
+        },
+
+        counter: {
+            type: Number,
+            default: 0
+        },
+
+        transports: [
+            {
+                type: String
+            }
+        ],
+
+        deviceType: String,
+
+        backedUp: {
+            type: Boolean,
+            default: false
+        },
+
+        name: {
+            type: String,
+            default: "Passkey"
+        },
+
+        registeredAt: {
+            type: Date,
+            default: Date.now
+        },
+
+        lastUsedAt: Date
+    },
+    {
+        _id: false
+    }
+);
+
 const studentSchema = new mongoose.Schema({
 
     fullName: {
@@ -60,6 +108,8 @@ const studentSchema = new mongoose.Schema({
         }
     ],
 
+    passkeys: [studentPasskeySchema],
+
     isBlocked: {
         type: Boolean,
         default: false
@@ -76,6 +126,10 @@ const studentSchema = new mongoose.Schema({
 studentSchema.index(
     { college: 1, enrollmentNumber: 1 },
     { unique: true }
+);
+studentSchema.index(
+    { "passkeys.credentialId": 1 },
+    { sparse: true }
 );
 
 studentSchema.pre("save", async function () {

@@ -36,7 +36,7 @@ const studentAttendanceSnapshotSchema = new mongoose.Schema(
 
         verificationMethod: {
             type: String,
-            enum: ["GEOLOCATION", "MANUAL", "AUTO_ABSENT"],
+            enum: ["GEOLOCATION", "PASSKEY_GEOLOCATION", "MANUAL", "AUTO_ABSENT"],
             default: "GEOLOCATION"
         },
 

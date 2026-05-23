@@ -241,16 +241,49 @@
                         <p><%= student.email %></p>
 
                         <div class="admin-meta">
-                            <span class="admin-badge"><%= student.enrollmentNumber %></span>
-                            <span class="admin-badge"><%= student.department %></span>
-                            <span class="admin-badge">Sem <%= student.semester %></span>
+                            <span class="admin-badge">
+                                <%= student.enrollmentNumber %>
+                            </span>
+
+                            <span class="admin-badge">
+                                <%= student.department %>
+                            </span>
+
+                            <span class="admin-badge">
+                                Sem <%= student.semester %>
+                            </span>
 
                             <% if (student.classGroup) { %>
-                                <span class="admin-badge"><%= student.classGroup.name %></span>
+                                <span class="admin-badge">
+                                    <%= student.classGroup.name %>
+                                </span>
                             <% } else { %>
-                                <span class="admin-badge">Class Missing</span>
+                                <span class="admin-badge">
+                                    Class Missing
+                                </span>
                             <% } %>
+
+                            <span class="admin-badge <%= student.passkeys && student.passkeys.length > 0 ? 'success' : 'danger' %>">
+                                <i class="fa-solid fa-fingerprint"></i>
+                                <% if (student.passkeys && student.passkeys.length > 0) { %>
+                                    <%= student.passkeys.length %> Passkey(s)
+                                <% } else { %>
+                                    No Passkey
+                                <% } %>
+                            </span>
                         </div>
+
+                        <form
+                            action="/admin/students/<%= student._id %>/reset-passkeys"
+                            method="POST"
+                            class="admin-reset-passkey-form"
+                            onsubmit="return confirm('Reset all passkeys for <%= student.fullName %>? Student will need to register a new passkey.')"
+                        >
+                            <button class="admin-warning-btn" type="submit">
+                                <i class="fa-solid fa-fingerprint"></i>
+                                Reset Passkeys
+                            </button>
+                        </form>
 
                         <details class="admin-edit-box">
                             <summary>

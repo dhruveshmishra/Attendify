@@ -32,22 +32,27 @@
         </div>
 
         <nav class="sidebar-menu">
+
             <a href="/teacher/dashboard" class="menu-link active">
-                <i class="fa-solid fa-house"></i>
+                <i class="fa-solid fa-gauge"></i>
                 <span>Dashboard</span>
             </a>
+
+            <a href="#schedule-section" class="menu-link">
+                <i class="fa-solid fa-calendar-days"></i>
+                <span>Schedule</span>
+            </a>
+
             <a href="#attendance-section" class="menu-link">
                 <i class="fa-solid fa-user-check"></i>
                 <span>Attendance</span>
             </a>
-            <a href="#" class="menu-link">
-                <i class="fa-solid fa-book"></i>
-                <span>Subjects</span>
-            </a>
-            <a href="#" class="menu-link">
+
+            <a href="/teacher/reports" class="menu-link">
                 <i class="fa-solid fa-chart-line"></i>
                 <span>Reports</span>
             </a>
+
         </nav>
 
         <p class="settings-text">Settings</p>
@@ -101,7 +106,7 @@
 
         <section class="content-area">
 
-            <div class="panel-box">
+            <div class="panel-box" id="schedule-section">
                 <h3 class="panel-title"><i class="fa-solid fa-list-check"></i> Schedule</h3>
                 <p class="panel-subtitle">Start is only available during class time</p>
 
@@ -211,7 +216,7 @@
                 <% } %>
 
                 <% activeSessions.forEach(function(session) { %>
-                    <div class="live-card">
+                    <div class="live-card" data-session-id="<%= session._id %>">
                         <div class="live-top">
                             <div>
                                 <% if (session.subject) { %>
@@ -231,10 +236,36 @@
 
                         <div class="live-meta">
                             <% if (session.classroom) { %>
-                                <p><i class="fa-solid fa-location-dot"></i> <%= session.classroom.classroomName %></p>
+                                <p>
+                                    <i class="fa-solid fa-location-dot"></i>
+                                    <%= session.classroom.classroomName %>
+                                </p>
                             <% } %>
-                            <p><i class="fa-solid fa-clock"></i> Ends: <%= session.endTime.toLocaleString() %></p>
+
+                            <p>
+                                <i class="fa-solid fa-clock"></i>
+                                Ends: <%= session.endTime.toLocaleString() %>
+                            </p>
+
+                            <p>
+                                <i class="fa-solid fa-user-check"></i>
+                                Present:
+                                <span class="js-live-present-count">
+                                    <%= session.presentStudents ? session.presentStudents.length : 0 %>
+                                </span>
+                            </p>
                         </div>
+
+                        <ul class="live-student-list js-live-student-list">
+                            <% if (session.presentStudents && session.presentStudents.length > 0) { %>
+                                <% session.presentStudents.slice(-5).reverse().forEach(function(item) { %>
+                                    <li>
+                                        <strong><%= item.fullName %></strong>
+                                        <span><%= item.enrollmentNumber %></span>
+                                    </li>
+                                <% }) %>
+                            <% } %>
+                        </ul>
 
                         <form action="/teacher/attendance/end/<%= session._id %>" method="POST">
                             <button class="end-btn" type="submit">
@@ -301,6 +332,26 @@
             </div>
 
         </section>
+        
+        <section class="teacher-card suspicious-attempts-card">
+            <div class="teacher-card-header">
+                <div>
+                    <h3>Suspicious Attempts</h3>
+                    <p>Realtime rejected attendance attempts for today.</p>
+                </div>
+
+                <span class="suspicious-count-pill" id="suspiciousAttemptCount">
+                    0 Alerts
+                </span>
+            </div>
+
+            <div class="suspicious-empty" id="suspiciousEmptyState">
+                <i class="fa-solid fa-shield-halved"></i>
+                <p>No suspicious attempts detected yet.</p>
+            </div>
+
+            <ul class="suspicious-attempt-list" id="suspiciousAttemptList"></ul>
+        </section>
     </main>
 
     <aside class="teacher-profile-panel">
@@ -351,6 +402,8 @@
 
 </div>
 
-</body>
 <script src="/js/teacherLocation.js"></script>
+<script src="/socket.io/socket.io.js"></script>
+<script src="/js/teacherRealtime.js"></script>
+</body>
 </html>
