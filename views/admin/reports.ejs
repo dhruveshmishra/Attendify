@@ -7,6 +7,9 @@
 
     <link rel="stylesheet" href="/css/adminTheme.css">
 
+    <link rel="stylesheet" href="/css/uiShell.css">
+    <link rel="stylesheet" href="/css/finalUiFix.css">
+
     <link
         rel="stylesheet"
         href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
@@ -450,8 +453,38 @@
                                     </td>
 
                                     <td>
-                                        <% if (record.distanceFromClassroom !== undefined && record.distanceFromClassroom !== null) { %>
-                                            <%= Math.round(record.distanceFromClassroom) %>m
+                                        <%
+                                            const adminRecordDeviceInfo = record.deviceInfo || {};
+                                            const adminHasVerifiedDistance =
+                                                adminRecordDeviceInfo.verifiedDistanceFromClassroom !== undefined ||
+                                                adminRecordDeviceInfo.minimumPossibleDistance !== undefined;
+                                            const adminVerifiedDistance =
+                                                adminRecordDeviceInfo.verifiedDistanceFromClassroom !== undefined &&
+                                                adminRecordDeviceInfo.verifiedDistanceFromClassroom !== null
+                                                    ? adminRecordDeviceInfo.verifiedDistanceFromClassroom
+                                                    : (
+                                                        adminRecordDeviceInfo.minimumPossibleDistance !== undefined &&
+                                                        adminRecordDeviceInfo.minimumPossibleDistance !== null
+                                                            ? adminRecordDeviceInfo.minimumPossibleDistance
+                                                            : record.distanceFromClassroom
+                                                    );
+                                            const adminMeasuredDistance =
+                                                adminRecordDeviceInfo.measuredDistanceFromClassroom !== undefined &&
+                                                adminRecordDeviceInfo.measuredDistanceFromClassroom !== null
+                                                    ? adminRecordDeviceInfo.measuredDistanceFromClassroom
+                                                    : null;
+                                        %>
+                                        <% if (adminVerifiedDistance !== undefined && adminVerifiedDistance !== null) { %>
+                                            <span class="gps-distance-cell">
+                                                <span class="gps-distance-pill">
+                                                    <%= adminHasVerifiedDistance ? "Verified" : "Recorded" %>
+                                                    <%= Math.round(adminVerifiedDistance) %>m
+                                                </span>
+
+                                                <% if (adminMeasuredDistance !== null && Math.round(adminMeasuredDistance) !== Math.round(adminVerifiedDistance)) { %>
+                                                    <small>GPS read <%= Math.round(adminMeasuredDistance) %>m</small>
+                                                <% } %>
+                                            </span>
                                         <% } else { %>
                                             -
                                         <% } %>
@@ -544,6 +577,6 @@
 </div>
 
 <script src="/js/adminSearch.js"></script>
-<script src="/js/adminSidebarToggle.js"></script>
+<script src="/js/uiShell.js"></script>
 </body>
 </html>

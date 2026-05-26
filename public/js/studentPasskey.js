@@ -1,10 +1,39 @@
 document.addEventListener("DOMContentLoaded", function () {
     const registerButton = document.getElementById("registerPasskeyBtn");
     const passkeyStatusText = document.getElementById("passkeyStatusText");
+    const trustedDeviceForm = document.getElementById("trustedDeviceForm");
+    const passkeySupportHint = document.getElementById("passkeySupportHint");
 
     if (registerButton) {
         registerButton.addEventListener("click", function () {
             registerStudentPasskey(registerButton, passkeyStatusText);
+        });
+    }
+
+    if (registerButton && passkeySupportHint) {
+        checkLocalPasskeySupport().then(function (support) {
+            if (support.supported) {
+                passkeySupportHint.innerText = "Passkeys are available in this browser.";
+                passkeySupportHint.classList.add("supported");
+                return;
+            }
+
+            passkeySupportHint.innerText = !window.isSecureContext
+                ? support.message + " Attendance location also needs HTTPS."
+                : support.message + " Use trusted browser fallback below.";
+            passkeySupportHint.classList.add("unsupported");
+
+            if (!registerButton.disabled) {
+                registerButton.disabled = true;
+                registerButton.innerHTML = '<i class="fa-solid fa-ban"></i> Passkey Unavailable';
+            }
+        });
+    }
+
+    if (trustedDeviceForm) {
+        trustedDeviceForm.addEventListener("submit", function (event) {
+            event.preventDefault();
+            registerTrustedBrowserFromSecurityPage(trustedDeviceForm);
         });
     }
 });
@@ -23,37 +52,64 @@ function showPasskeyMessage(message, type) {
         return;
     }
 
+    const messageBox = document.getElementById("messageBox");
+
+    if (messageBox) {
+        messageBox.innerHTML = "";
+
+        const div = document.createElement("div");
+        div.className = type === "error" ? "error-box" : "success-box";
+        div.innerText = message;
+
+        messageBox.appendChild(div);
+
+        setTimeout(function () {
+            div.remove();
+        }, 5000);
+
+        return;
+    }
+
     alert(message);
 }
 
-async function checkLocalPasskeySupport() {
+function getBrowserFingerprintForSecurityPage() {
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "unknown";
+
+    return [
+        navigator.userAgent || "unknown",
+        navigator.language || "unknown",
+        timezone,
+        screen.width + "x" + screen.height,
+        screen.colorDepth || "unknown"
+    ].join("|");
+}
+
+function getPasskeyBrowserHelpMessage() {
+    if (!window.isSecureContext) {
+        return "Passkeys need HTTPS or localhost. Use localhost during development or HTTPS in production.";
+    }
+
     if (!webauthnAvailable()) {
+        return "This browser does not support passkeys. Use latest Chrome, Edge, Safari, or Firefox with passkey support.";
+    }
+
+    return "";
+}
+
+async function checkLocalPasskeySupport() {
+    const browserMessage = getPasskeyBrowserHelpMessage();
+
+    if (browserMessage) {
         return {
             supported: false,
-            message: "This browser does not support passkeys. Use latest Chrome, Edge, or Safari."
+            message: browserMessage
         };
     }
 
-    try {
-        const available = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
-
-        if (!available) {
-            return {
-                supported: false,
-                message: "No local passkey option found. Do not use Chrome Guest mode. Use normal Chrome/Safari profile and make sure device lock, Touch ID, Face ID, or PIN is enabled."
-            };
-        }
-
-        return {
-            supported: true
-        };
-
-    } catch (err) {
-        return {
-            supported: false,
-            message: "Passkey check failed. Try normal Chrome profile or Safari."
-        };
-    }
+    return {
+        supported: true
+    };
 }
 
 async function registerStudentPasskey(button, statusText) {
@@ -124,13 +180,77 @@ async function registerStudentPasskey(button, statusText) {
     } catch (err) {
         console.log(err);
 
-        showPasskeyMessage(
-            err.message || "Passkey setup cancelled or failed.",
-            "error"
-        );
+        let message = err.message || "Passkey setup cancelled or failed.";
+
+        if (
+            message.toLowerCase().includes("notallowed") ||
+            message.toLowerCase().includes("not allowed")
+        ) {
+            message = "Passkey setup was cancelled or blocked. Use normal browser profile, enable device lock/Touch ID/PIN, and avoid Guest/Incognito mode.";
+        }
+
+        showPasskeyMessage(message, "error");
 
         button.disabled = false;
-        button.innerText = "Set Up Passkey";
+        button.innerText = "Add New Passkey";
+    }
+}
+
+async function registerTrustedBrowserFromSecurityPage(form) {
+    const passwordInput = form.querySelector("input[name='password']");
+    const button = form.querySelector("button[type='submit']");
+
+    if (!passwordInput || !button) {
+        showPasskeyMessage("Trusted browser form is incomplete.", "error");
+        return;
+    }
+
+    const password = passwordInput.value;
+
+    if (!password) {
+        showPasskeyMessage("Enter your password to trust this browser.", "error");
+        return;
+    }
+
+    const oldText = button.innerText;
+
+    try {
+        button.disabled = true;
+        button.innerText = "Verifying...";
+
+        const response = await fetch("/student/device/register", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            credentials: "same-origin",
+            body: JSON.stringify({
+                password: password,
+                browserFingerprint: getBrowserFingerprintForSecurityPage()
+            })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok || !data.success) {
+            throw new Error(data.message || "Could not trust this browser.");
+        }
+
+        passwordInput.value = "";
+
+        showPasskeyMessage(data.message, "success");
+
+        setTimeout(function () {
+            window.location.reload();
+        }, 1000);
+
+    } catch (err) {
+        console.log(err);
+
+        showPasskeyMessage(err.message || "Could not trust this browser.", "error");
+
+        button.disabled = false;
+        button.innerText = oldText;
     }
 }
 
@@ -139,8 +259,10 @@ async function getAttendanceTokenWithPasskey(sessionId) {
         throw new Error("Passkey library is not loaded. Refresh once.");
     }
 
-    if (!webauthnAvailable()) {
-        throw new Error("This browser does not support passkeys.");
+    const browserMessage = getPasskeyBrowserHelpMessage();
+
+    if (browserMessage) {
+        throw new Error(browserMessage);
     }
 
     const optionsResponse = await fetch("/student/attendance/passkey/options/" + sessionId, {

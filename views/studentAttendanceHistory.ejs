@@ -7,6 +7,9 @@
 
     <link rel="stylesheet" href="/css/studentSchedule.css">
 
+    <link rel="stylesheet" href="/css/uiShell.css">
+    <link rel="stylesheet" href="/css/finalUiFix.css">
+
     <link
         rel="stylesheet"
         href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
@@ -16,43 +19,7 @@
 
 <div class="student-layout">
 
-    <aside class="student-sidebar">
-        <div class="student-brand">
-            <i class="fa-solid fa-clipboard-check"></i>
-            <span>Attendify</span>
-        </div>
-
-        <nav class="student-nav">
-
-            <a href="/student/dashboard" class="<%= activePage === 'dashboard' ? 'active' : '' %>">
-                <i class="fa-solid fa-gauge"></i>
-                Dashboard
-            </a>
-
-            <a href="/student/schedule" class="<%= activePage === 'schedule' ? 'active' : '' %>">
-                <i class="fa-solid fa-calendar-days"></i>
-                Schedule
-            </a>
-
-            <a href="/student/attendance-history" class="<%= activePage === 'attendance-history' ? 'active' : '' %>">
-                <i class="fa-solid fa-chart-column"></i>
-                Attendance History
-            </a>
-
-            <a href="/student/passkeys" class="<%= activePage === 'passkeys' ? 'active' : '' %>">
-                <i class="fa-solid fa-fingerprint"></i>
-                Passkeys
-            </a>
-
-            <form action="/logout" method="POST" class="student-logout-form">
-                <button class="student-nav-logout" type="submit">
-                    <i class="fa-solid fa-right-from-bracket"></i>
-                    Logout
-                </button>
-            </form>
-
-        </nav>
-    </aside>
+    <%- include("student/partials/sidebar", { activePage, student }) %>
 
     <main class="student-main">
 
@@ -63,6 +30,34 @@
                 <p>View your attendance records, subject-wise summary and rejected attempts.</p>
             </div>
         </header>
+
+        <%
+            const exportQuery = [
+                "fromDate=" + encodeURIComponent(filters.fromDate),
+                "toDate=" + encodeURIComponent(filters.toDate),
+                "subjectId=" + encodeURIComponent(filters.subjectId),
+                "status=" + encodeURIComponent(filters.status)
+            ].join("&");
+        %>
+
+        <section class="student-history-card student-export-card">
+            <div class="student-export-content">
+                <div>
+                    <h3>Export Attendance</h3>
+                    <p>Download your attendance history using the selected filters.</p>
+                </div>
+
+                <div class="student-export-actions">
+                    <a
+                        href="/student/attendance-history/export?<%= exportQuery %>"
+                        class="student-secondary-btn"
+                    >
+                        <i class="fa-solid fa-file-csv"></i>
+                        Export CSV
+                    </a>
+                </div>
+            </div>
+        </section>
 
         <section class="student-history-profile-card">
             <div>
@@ -241,8 +236,8 @@
         <section class="student-history-card">
             <div class="student-history-card-head">
                 <div>
-                    <h3>Detailed Attendance Records</h3>
-                    <p>Latest 1000 records matching selected filters.</p>
+                    <h3>Detailed Attendance Records (Subject-wise)</h3>
+                    <p>Attendance records are grouped by subject for easier tracking.</p>
                 </div>
 
                 <span class="student-count-pill">
@@ -250,81 +245,137 @@
                 </span>
             </div>
 
-            <% if (!attendanceRecords || attendanceRecords.length === 0) { %>
+            <% if (!subjectWiseAttendance || subjectWiseAttendance.length === 0) { %>
                 <div class="student-history-empty">
                     No attendance records found.
                 </div>
             <% } else { %>
-                <div class="student-history-table-wrap">
-                    <table class="student-history-table">
-                        <thead>
-                            <tr>
-                                <th>Date</th>
-                                <th>Subject</th>
-                                <th>Teacher</th>
-                                <th>Classroom</th>
-                                <th>Status</th>
-                                <th>Method</th>
-                                <th>Distance</th>
-                            </tr>
-                        </thead>
-
-                        <tbody>
-                            <% attendanceRecords.forEach(function(record) { %>
-                                <%
-                                    const session = record.attendanceSession;
-                                    const teacher = session && session.teacher ? session.teacher : null;
-                                    const sessionDate = session && session.startTime ? session.startTime : record.createdAt;
-                                %>
-
-                                <tr>
-                                    <td>
-                                        <%= new Date(sessionDate).toLocaleDateString() %>
-                                        <br>
-                                        <small>
-                                            <%= new Date(sessionDate).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) %>
-                                        </small>
-                                    </td>
-
-                                    <td>
-                                        <strong>
-                                            <%= record.subject ? record.subject.subjectName : "Subject Missing" %>
-                                        </strong>
-                                        <br>
-                                        <small>
-                                            <%= record.subject && record.subject.subjectCode ? record.subject.subjectCode : "-" %>
-                                        </small>
-                                    </td>
-
-                                    <td>
-                                        <%= teacher ? teacher.fullName : "Teacher Missing" %>
-                                    </td>
-
-                                    <td>
-                                        <%= record.classroom ? record.classroom.classroomName : "Classroom Missing" %>
-                                    </td>
-
-                                    <td>
-                                        <span class="student-status <%= record.status === 'PRESENT' ? 'present' : 'absent' %>">
-                                            <%= record.status %>
-                                        </span>
-                                    </td>
-
-                                    <td>
-                                        <%= record.verificationMethod || "-" %>
-                                    </td>
-
-                                    <td>
-                                        <% if (record.distanceFromClassroom !== undefined && record.distanceFromClassroom !== null) { %>
-                                            <%= Math.round(record.distanceFromClassroom) %>m
+                <div class="student-history-subject-groups">
+                    <% subjectWiseAttendance.forEach(function(group, groupIndex) { %>
+                        <details class="student-history-subject-block" <%= groupIndex < 2 ? "open" : "" %>>
+                            <summary class="student-history-subject-summary">
+                                <div class="student-history-subject-head">
+                                    <h4><%= group.subjectName %></h4>
+                                    <p>
+                                        <% if (group.subjectCode) { %>
+                                            Code: <%= group.subjectCode %>
                                         <% } else { %>
-                                            -
+                                            Code: -
                                         <% } %>
-                                    </td>
-                                </tr>
-                            <% }) %>
-                        </tbody>
-                    </table>
+                                    </p>
+                                </div>
+
+                                <div class="student-history-subject-stats">
+                                    <span class="student-count-pill">
+                                        <%= group.total %> Total
+                                    </span>
+                                    <span class="student-count-pill success">
+                                        <%= group.present %> Present
+                                    </span>
+                                    <span class="student-count-pill danger">
+                                        <%= group.absent %> Absent
+                                    </span>
+                                    <span class="student-percent-pill <%= group.percentage >= 75 ? 'good' : 'bad' %>">
+                                        <%= group.percentage %>%
+                                    </span>
+                                </div>
+                            </summary>
+
+                            <div class="student-history-table-wrap">
+                                <table class="student-history-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Date</th>
+                                            <th>Teacher</th>
+                                            <th>Classroom</th>
+                                            <th>Status</th>
+                                            <th>Method</th>
+                                            <th>Distance</th>
+                                        </tr>
+                                    </thead>
+
+                                    <tbody>
+                                        <% group.records.forEach(function(record) { %>
+                                            <%
+                                                const session = record.attendanceSession;
+                                                const teacher = session && session.teacher ? session.teacher : null;
+                                                const sessionDate = session && session.startTime ? session.startTime : record.createdAt;
+                                                const deviceInfo = record.deviceInfo || {};
+                                                const hasVerifiedDistance =
+                                                    deviceInfo.verifiedDistanceFromClassroom !== undefined ||
+                                                    deviceInfo.minimumPossibleDistance !== undefined;
+                                                const verifiedDistance =
+                                                    deviceInfo.verifiedDistanceFromClassroom !== undefined &&
+                                                    deviceInfo.verifiedDistanceFromClassroom !== null
+                                                        ? deviceInfo.verifiedDistanceFromClassroom
+                                                        : (
+                                                            deviceInfo.minimumPossibleDistance !== undefined &&
+                                                            deviceInfo.minimumPossibleDistance !== null
+                                                                ? deviceInfo.minimumPossibleDistance
+                                                                : record.distanceFromClassroom
+                                                        );
+                                                const measuredDistance =
+                                                    deviceInfo.measuredDistanceFromClassroom !== undefined &&
+                                                    deviceInfo.measuredDistanceFromClassroom !== null
+                                                        ? deviceInfo.measuredDistanceFromClassroom
+                                                        : null;
+                                            %>
+
+                                            <tr>
+                                                <td>
+                                                    <%= new Date(sessionDate).toLocaleDateString() %>
+                                                    <br>
+                                                    <small>
+                                                        <%= new Date(sessionDate).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) %>
+                                                    </small>
+                                                </td>
+
+                                                <td>
+                                                    <%= teacher ? teacher.fullName : "Teacher Missing" %>
+                                                </td>
+
+                                                <td>
+                                                    <%= record.classroom ? record.classroom.classroomName : "Classroom Missing" %>
+                                                </td>
+
+                                                <td>
+                                                    <span class="student-status <%= record.status === 'PRESENT' ? 'present' : 'absent' %>">
+                                                        <%= record.status %>
+                                                    </span>
+                                                </td>
+
+                                                <td>
+                                                    <%= record.verificationMethod || "-" %>
+                                                </td>
+
+                                                <td>
+                                                    <% if (verifiedDistance !== undefined && verifiedDistance !== null) { %>
+                                                        <span class="gps-distance-cell">
+                                                            <span class="gps-distance-pill">
+                                                                <%= hasVerifiedDistance ? "Verified" : "Recorded" %>
+                                                                <%= Math.round(verifiedDistance) %>m
+                                                            </span>
+
+                                                            <% if (measuredDistance !== null && Math.round(measuredDistance) !== Math.round(verifiedDistance)) { %>
+                                                                <small>
+                                                                    GPS read <%= Math.round(measuredDistance) %>m
+                                                                    <% if (deviceInfo.gpsAccuracy) { %>
+                                                                        · accuracy <%= Math.round(deviceInfo.gpsAccuracy) %>m
+                                                                    <% } %>
+                                                                </small>
+                                                            <% } %>
+                                                        </span>
+                                                    <% } else { %>
+                                                        -
+                                                    <% } %>
+                                                </td>
+                                            </tr>
+                                        <% }) %>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </details>
+                    <% }) %>
                 </div>
             <% } %>
         </section>
@@ -395,5 +446,6 @@
 
 </div>
 
+<script src="/js/uiShell.js"></script>
 </body>
 </html>

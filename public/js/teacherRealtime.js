@@ -3,12 +3,52 @@ document.addEventListener("DOMContentLoaded", function () {
         return;
     }
 
-    const socket = io();
+    const socket =
+        window.AttendifySharedSocket ||
+        io({
+            transports: ["websocket", "polling"],
+            withCredentials: true,
+            timeout: 20000,
+            reconnectionAttempts: 20,
+            reconnectionDelay: 1000,
+            reconnectionDelayMax: 5000
+        });
+    window.AttendifySharedSocket = socket;
 
-    socket.emit("teacher:join");
+    if (socket.__teacherRealtimeAttached === true) {
+        return;
+    }
+
+    socket.__teacherRealtimeAttached = true;
+    window.__attendifyRoleSpecificRealtime = true;
+
+    function joinTeacherRealtime() {
+        socket.emit("teacher:join");
+    }
+
+    socket.on("connect", function () {
+        joinTeacherRealtime();
+    });
+
+    if (socket.connected) {
+        joinTeacherRealtime();
+    }
 
     function findLiveCard(sessionId) {
         return document.querySelector(".live-card[data-session-id='" + sessionId + "']");
+    }
+
+    function createIcon(className) {
+        const icon = document.createElement("i");
+        icon.className = className;
+        return icon;
+    }
+
+    function createMetaSpan(iconClass, text) {
+        const span = document.createElement("span");
+        span.appendChild(createIcon(iconClass));
+        span.appendChild(document.createTextNode(" " + text));
+        return span;
     }
 
     function showTeacherToast(message, type) {
@@ -21,7 +61,7 @@ document.addEventListener("DOMContentLoaded", function () {
             document.body.appendChild(toast);
         }
 
-        toast.textContent = message;
+        toast.textContent = message || "";
 
         toast.classList.remove("danger");
 
@@ -35,6 +75,18 @@ document.addEventListener("DOMContentLoaded", function () {
             toast.classList.remove("show");
         }, 4000);
     }
+
+    socket.on("socket:error", function (payload) {
+        if (!payload || !payload.message) {
+            return;
+        }
+
+        showTeacherToast(payload.message, "danger");
+    });
+
+    socket.on("connect_error", function () {
+        showTeacherToast("Realtime connection issue. Reconnecting...", "danger");
+    });
 
     function formatTime(dateValue) {
         if (!dateValue) {
@@ -64,6 +116,7 @@ document.addEventListener("DOMContentLoaded", function () {
             CLASS_GROUP_MISMATCH: "Wrong class group",
             ALREADY_MARKED: "Already marked",
             TEACHER_LOCATION_MISSING: "Teacher location missing",
+            CLASSROOM_LOCATION_MISSING: "Attendance location missing",
             DUPLICATE_ATTENDANCE: "Duplicate attendance",
             SERVER_ERROR: "Server error"
         };
@@ -108,55 +161,63 @@ document.addEventListener("DOMContentLoaded", function () {
         item.className = "suspicious-attempt-item";
         item.setAttribute("data-attempt-id", payload.attemptId || "");
 
-        const reasonLabel = getReasonLabel(payload.reasonCode, payload.reasonMessage);
+        const top = document.createElement("div");
+        top.className = "suspicious-attempt-top";
 
-        let distanceText = "";
+        const studentBox = document.createElement("div");
+
+        const name = document.createElement("strong");
+        name.textContent = payload.studentName || "Unknown Student";
+
+        const enrollment = document.createElement("small");
+        enrollment.textContent = payload.enrollmentNumber || "Unknown";
+
+        studentBox.appendChild(name);
+        studentBox.appendChild(enrollment);
+
+        const time = document.createElement("span");
+        time.className = "suspicious-time";
+        time.textContent = formatTime(payload.createdAt);
+
+        top.appendChild(studentBox);
+        top.appendChild(time);
+
+        const reason = document.createElement("p");
+        reason.textContent = getReasonLabel(payload.reasonCode, payload.reasonMessage);
+
+        const meta = document.createElement("div");
+        meta.className = "suspicious-meta";
 
         if (payload.distanceFromTeacher && Number(payload.distanceFromTeacher) > 0) {
-            distanceText =
-                "<span><i class='fa-solid fa-location-arrow'></i> " +
-                payload.distanceFromTeacher +
-                "m away</span>";
+            meta.appendChild(
+                createMetaSpan(
+                    "fa-solid fa-location-arrow",
+                    Number(payload.distanceFromTeacher) + "m away"
+                )
+            );
         }
-
-        let radiusText = "";
 
         if (payload.allowedRadius && Number(payload.allowedRadius) > 0) {
-            radiusText =
-                "<span><i class='fa-solid fa-circle-dot'></i> Radius " +
-                payload.allowedRadius +
-                "m</span>";
+            meta.appendChild(
+                createMetaSpan(
+                    "fa-solid fa-circle-dot",
+                    "Radius " + Number(payload.allowedRadius) + "m"
+                )
+            );
         }
-
-        let accuracyText = "";
 
         if (payload.gpsAccuracy && Number(payload.gpsAccuracy) > 0) {
-            accuracyText =
-                "<span><i class='fa-solid fa-crosshairs'></i> Accuracy " +
-                payload.gpsAccuracy +
-                "m</span>";
+            meta.appendChild(
+                createMetaSpan(
+                    "fa-solid fa-crosshairs",
+                    "Accuracy " + Number(payload.gpsAccuracy) + "m"
+                )
+            );
         }
 
-        item.innerHTML = `
-            <div class="suspicious-attempt-top">
-                <div>
-                    <strong>${payload.studentName || "Unknown Student"}</strong>
-                    <small>${payload.enrollmentNumber || "Unknown"}</small>
-                </div>
-
-                <span class="suspicious-time">
-                    ${formatTime(payload.createdAt)}
-                </span>
-            </div>
-
-            <p>${reasonLabel}</p>
-
-            <div class="suspicious-meta">
-                ${distanceText}
-                ${radiusText}
-                ${accuracyText}
-            </div>
-        `;
+        item.appendChild(top);
+        item.appendChild(reason);
+        item.appendChild(meta);
 
         if (prepend) {
             list.prepend(item);
@@ -210,7 +271,7 @@ document.addEventListener("DOMContentLoaded", function () {
             const countElement = card.querySelector(".js-live-present-count");
 
             if (countElement) {
-                countElement.textContent = payload.totalPresent;
+                countElement.textContent = payload.totalPresent || 0;
             }
 
             const list = card.querySelector(".js-live-student-list");
@@ -218,18 +279,24 @@ document.addEventListener("DOMContentLoaded", function () {
             if (list) {
                 const item = document.createElement("li");
 
-                item.innerHTML =
-                    "<strong>" +
-                    payload.studentName +
-                    "</strong> <span>" +
-                    payload.enrollmentNumber +
-                    "</span>";
+                const studentName = document.createElement("strong");
+                studentName.textContent = payload.studentName || "Unknown Student";
+
+                const enrollmentNumber = document.createElement("span");
+                enrollmentNumber.textContent = payload.enrollmentNumber || "Unknown";
+
+                item.appendChild(studentName);
+                item.appendChild(document.createTextNode(" "));
+                item.appendChild(enrollmentNumber);
 
                 list.prepend(item);
             }
         }
 
-        showTeacherToast(payload.studentName + " marked attendance", "success");
+        showTeacherToast(
+            (payload.studentName || "Student") + " marked attendance",
+            "success"
+        );
     });
 
     socket.on("attendance:ended:teacher", function (payload) {
@@ -252,7 +319,10 @@ document.addEventListener("DOMContentLoaded", function () {
         addSuspiciousAttempt(payload, true);
 
         showTeacherToast(
-            "Suspicious attempt: " + (payload.studentName || "Student") + " - " + getReasonLabel(payload.reasonCode, payload.reasonMessage),
+            "Suspicious attempt: " +
+                (payload.studentName || "Student") +
+                " - " +
+                getReasonLabel(payload.reasonCode, payload.reasonMessage),
             "danger"
         );
     });

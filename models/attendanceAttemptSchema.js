@@ -110,4 +110,7 @@ attendanceAttemptSchema.index({ attendanceSession: 1, student: 1, createdAt: -1 
 attendanceAttemptSchema.index({ teacher: 1, createdAt: -1 });
 attendanceAttemptSchema.index({ college: 1, result: 1, createdAt: -1 });
 
-module.exports = mongoose.model("AttendanceAttempt", attendanceAttemptSchema);
+module.exports = mongoose.models.AttendanceAttempt || mongoose.model(
+    "AttendanceAttempt",
+    attendanceAttemptSchema
+);

@@ -1,3 +1,5 @@
+@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800;900&family=Sora:wght@600;700;800&display=swap");
+
 * {
     margin: 0;
     padding: 0;
@@ -5,7 +7,7 @@
 }
 
 body {
-    font-family: Inter, Arial, sans-serif;
+    font-family: "Manrope", "Segoe UI", "Trebuchet MS", sans-serif;
     background: #f4f6fb;
     color: #111827;
     overflow-x: hidden;
@@ -13,16 +15,17 @@ body {
     text-rendering: optimizeLegibility;
 }
 
-.schedule-layout {
-    min-height: 100vh;
-    display: grid;
-    grid-template-columns: 300px minmax(0, 1fr) 350px;
-    background: #f4f6fb;
+h1,
+h2,
+h3,
+h4 {
+    font-family: "Sora", "Manrope", "Segoe UI", sans-serif;
+    letter-spacing: -0.02em;
 }
 
-/* ================= LEFT SIDEBAR ================= */
+/* Layout grid and sidebar shell: uiShell.css */
 
-.schedule-sidebar {
+.schedule-sidebar:not(.ui-sidebar) {
     min-height: 100vh;
     height: 100vh;
     position: sticky;
@@ -100,8 +103,9 @@ body {
 }
 
 .menu-item.active {
-    background: #312e81;
+    background: #2563eb;
     color: #ffffff;
+    box-shadow: none;
 }
 
 .menu-item b {
@@ -112,13 +116,14 @@ body {
     background: #06b6d4;
 }
 
-.settings-title {
-    margin-top: auto;
+.settings-title,
+.settings-text {
+    margin-top: 0;
     padding-left: 2px;
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 800;
     text-transform: uppercase;
-    letter-spacing: 1.5px;
+    letter-spacing: 0.14em;
     color: #64748b;
 }
 
@@ -380,6 +385,19 @@ body {
     cursor: not-allowed;
 }
 
+.view-btn.marked.absent {
+    background: #fee2e2;
+    color: #b91c1c;
+    border-color: #fecaca;
+}
+
+.view-btn.unmarked {
+    background: #fff7ed;
+    color: #c2410c;
+    border-color: #fed7aa;
+    cursor: not-allowed;
+}
+
 .view-btn:disabled {
     cursor: not-allowed;
     opacity: 0.85;
@@ -413,6 +431,12 @@ body {
 .status-badge.absent {
     background: #fee2e2;
     color: #b91c1c;
+}
+
+.status-badge.unmarked {
+    background: #fff7ed;
+    color: #c2410c;
+    border: 1px solid #fed7aa;
 }
 
 /* ================= EMPTY STATE ================= */
@@ -514,8 +538,8 @@ body {
 }
 
 .side-card-icon.purple {
-    background: #ede9fe;
-    color: #7c3aed;
+    background: #e0f2fe;
+    color: #0284c7;
 }
 
 .side-card-icon.green {
@@ -627,8 +651,8 @@ body {
 }
 
 .menu-item.active {
-    background: linear-gradient(135deg, #4338ca, #312e81);
-    box-shadow: 0 14px 30px rgba(49, 46, 129, 0.32);
+    background: linear-gradient(135deg, #0b63f6, #0a4fd0);
+    box-shadow: none;
 }
 
 .menu-item:hover {
@@ -761,8 +785,8 @@ body {
 }
 
 .stat-icon.purple {
-    background: #ede9fe;
-    color: #7c3aed;
+    background: #e0f2fe;
+    color: #0284c7;
 }
 
 .stat-icon.green {
@@ -909,6 +933,18 @@ body {
     border-color: #bbf7d0;
 }
 
+.view-btn.marked.absent {
+    background: #fee2e2;
+    color: #b91c1c;
+    border-color: #fecaca;
+}
+
+.view-btn.unmarked {
+    background: #fff7ed;
+    color: #c2410c;
+    border-color: #fed7aa;
+}
+
 .status-badge {
     min-height: 40px;
     padding: 0 14px;
@@ -927,14 +963,46 @@ body {
     color: #b91c1c;
 }
 
+.status-badge.unmarked {
+    background: #fff7ed;
+    color: #c2410c;
+    border: 1px solid #fed7aa;
+}
+
 .status-badge.live {
-    background: #dbeafe;
-    color: #1d4ed8;
+    background: #fee2e2;
+    color: #b91c1c;
+    border: 1px solid #fecaca;
 }
 
 .status-badge.waiting {
     background: #f1f5f9;
     color: #64748b;
+}
+
+.status-badge.live i {
+    color: #ef4444;
+    animation: studentLiveDotBlink 1.05s ease-in-out infinite;
+    filter: drop-shadow(0 0 6px rgba(239, 68, 68, 0.45));
+}
+
+@keyframes studentLiveDotBlink {
+    0%,
+    100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+
+    50% {
+        opacity: 0.35;
+        transform: scale(0.78);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .status-badge.live i {
+        animation: none;
+    }
 }
 
 /* Right profile panel */
@@ -1225,13 +1293,32 @@ body {
 }
 
 .student-history-stat.purple i {
-    background: #ede9fe;
-    color: #7c3aed;
+    background: #e0f2fe;
+    color: #0284c7;
 }
 
 .student-history-stat.orange i {
     background: #ffedd5;
     color: #f97316;
+}
+
+.student-history-stat.security strong {
+    font-size: clamp(24px, 2.1vw, 40px);
+    line-height: 1.1;
+}
+
+.student-history-stat.security.is-active i {
+    background: #dcfce7;
+    color: #16a34a;
+}
+
+.student-history-stat.security.is-setup-needed i {
+    background: #ffedd5;
+    color: #c2410c;
+}
+
+.student-history-stat.security.is-setup-needed strong {
+    color: #9a3412;
 }
 
 .student-history-table-wrap {
@@ -1325,6 +1412,72 @@ body {
     color: #b91c1c;
 }
 
+.student-count-pill.success {
+    background: #dcfce7;
+    color: #15803d;
+}
+
+.student-history-subject-groups {
+    display: grid;
+    gap: 16px;
+}
+
+.student-history-subject-block {
+    border: 1px solid #dbe3ef;
+    border-radius: 20px;
+    background: #f8fbff;
+    overflow: hidden;
+}
+
+.student-history-subject-summary {
+    list-style: none;
+    padding: 14px 16px;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 14px;
+    cursor: pointer;
+    border-bottom: 1px solid transparent;
+}
+
+.student-history-subject-summary::-webkit-details-marker {
+    display: none;
+}
+
+.student-history-subject-block[open] .student-history-subject-summary {
+    border-bottom-color: #dbe3ef;
+}
+
+.student-history-subject-head h4 {
+    margin: 0;
+    color: #0f172a;
+    font-size: 18px;
+    font-weight: 950;
+}
+
+.student-history-subject-head p {
+    margin-top: 4px;
+    color: #64748b;
+    font-size: 13px;
+    font-weight: 800;
+}
+
+.student-history-subject-stats {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.student-history-subject-block .student-history-table-wrap {
+    margin: 0;
+}
+
+.student-history-subject-block .student-history-table {
+    min-width: 720px;
+}
+
 .student-history-empty {
     min-height: 100px;
     border: 1px dashed #cbd5e1;
@@ -1370,31 +1523,12 @@ body {
 .sidebar-menu .menu-item:hover,
 .sidebar-menu a.active,
 .sidebar-menu .menu-item.active {
-    background: linear-gradient(135deg, #4338ca, #312e81);
+    background: linear-gradient(135deg, #0b63f6, #0a4fd0);
     color: #ffffff;
-    box-shadow: 0 14px 30px rgba(49, 46, 129, 0.26);
+    box-shadow: none;
 }
 
-.student-layout {
-    min-height: 100vh;
-    display: grid;
-    grid-template-columns: 300px minmax(0, 1fr);
-    background: #f4f6fb;
-}
-
-.student-sidebar {
-    min-height: 100vh;
-    height: 100vh;
-    position: sticky;
-    top: 0;
-    padding: 32px 20px;
-    background: linear-gradient(180deg, #0f172a 0%, #111827 100%);
-    color: #ffffff;
-    display: flex;
-    flex-direction: column;
-    gap: 22px;
-    overflow-y: auto;
-}
+/* student-layout grid: uiShell.css */
 
 .student-brand {
     padding: 18px;
@@ -1454,9 +1588,9 @@ body {
 .student-nav a:hover,
 .student-nav-logout:hover,
 .student-nav a.active {
-    background: linear-gradient(135deg, #4338ca, #312e81);
+    background: linear-gradient(135deg, #0b63f6, #0a4fd0);
     color: #ffffff;
-    box-shadow: 0 14px 30px rgba(49, 46, 129, 0.26);
+    box-shadow: none;
 }
 
 .student-logout-form {
@@ -1566,6 +1700,20 @@ body {
     line-height: 1.7;
 }
 
+.student-support-hint {
+    display: block;
+    margin-top: 8px;
+    font-weight: 900;
+}
+
+.student-support-hint.supported {
+    color: #15803d;
+}
+
+.student-support-hint.unsupported {
+    color: #c2410c;
+}
+
 .student-passkey-grid {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1599,6 +1747,11 @@ body {
     font-size: 20px;
 }
 
+.student-passkey-icon.trusted {
+    background: #dcfce7;
+    color: #15803d;
+}
+
 .student-passkey-badge {
     padding: 7px 10px;
     border-radius: 999px;
@@ -1606,6 +1759,11 @@ body {
     color: #15803d;
     font-size: 12px;
     font-weight: 950;
+}
+
+.student-passkey-badge.pending {
+    background: #ffedd5;
+    color: #c2410c;
 }
 
 .student-passkey-card h4 {
@@ -1650,6 +1808,93 @@ body {
 
 .student-delete-passkey-btn:hover {
     background: #fecaca;
+}
+
+.student-trusted-browser-card {
+    background: linear-gradient(135deg, #f8fafc, #ffffff);
+}
+
+.student-trusted-browser-form {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 14px;
+    align-items: end;
+}
+
+.student-trusted-browser-form .student-field {
+    min-width: 0;
+}
+
+.student-trusted-browser-form input {
+    width: 100%;
+    min-height: 48px;
+    border-radius: 14px;
+    border: 1px solid #d7e3f3;
+    background: #f8fbff;
+    padding: 0 14px;
+    color: #0f172a;
+    font-size: 15px;
+    font-weight: 800;
+}
+
+.student-trusted-browser-form input:focus {
+    outline: none;
+    border-color: #2563eb;
+    box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1);
+}
+
+.student-trusted-device-card {
+    border-color: #d5eadc;
+}
+
+/* ================= STUDENT ATTENDANCE EXPORT ================= */
+
+.student-export-card {
+    margin-bottom: 24px;
+}
+
+.student-export-content {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+}
+
+.student-export-content h3 {
+    margin: 0;
+    color: #0f172a;
+    font-size: 20px;
+    font-weight: 950;
+}
+
+.student-export-content p {
+    margin: 6px 0 0;
+    color: #64748b;
+    font-size: 14px;
+    font-weight: 800;
+}
+
+.student-export-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.student-export-actions .student-secondary-btn {
+    width: auto;
+    min-height: 48px;
+    padding: 0 16px;
+}
+
+@media (max-width: 760px) {
+    .student-export-content {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .student-export-actions .student-secondary-btn {
+        width: 100%;
+    }
 }
 
 @media (max-width: 1150px) {
@@ -1698,6 +1943,10 @@ body {
     .student-passkey-grid {
         grid-template-columns: 1fr;
     }
+
+    .student-trusted-browser-form {
+        grid-template-columns: 1fr;
+    }
 }
 
 @media (max-width: 1200px) {
@@ -1720,6 +1969,14 @@ body {
     .student-history-summary-grid,
     .student-history-filter-grid {
         grid-template-columns: 1fr;
+    }
+
+    .student-history-subject-summary {
+        flex-direction: column;
+    }
+
+    .student-history-subject-stats {
+        justify-content: flex-start;
     }
 }
 

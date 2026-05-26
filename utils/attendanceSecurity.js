@@ -1,8 +1,16 @@
+require("dotenv").config();
+
 const crypto = require("crypto");
 
-const ATTENDANCE_SECRET =
-    process.env.ATTENDANCE_TOKEN_SECRET ||
-    "attendance-extra-security-secret-change-this-before-production";
+const ATTENDANCE_SECRET = process.env.ATTENDANCE_TOKEN_SECRET;
+
+if (!ATTENDANCE_SECRET) {
+    throw new Error("ATTENDANCE_TOKEN_SECRET is missing in .env file");
+}
+
+if (ATTENDANCE_SECRET.length < 32) {
+    throw new Error("ATTENDANCE_TOKEN_SECRET must be at least 32 characters long");
+}
 
 const rateLimitStore = new Map();
 const tokenNonceStore = new Map();
@@ -38,7 +46,9 @@ function safeCompare(a, b) {
     const first = Buffer.from(String(a));
     const second = Buffer.from(String(b));
 
-    if (first.length !== second.length) return false;
+    if (first.length !== second.length) {
+        return false;
+    }
 
     return crypto.timingSafeEqual(first, second);
 }
