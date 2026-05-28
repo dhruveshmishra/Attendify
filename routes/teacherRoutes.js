@@ -33,6 +33,7 @@ const {
 const {
     timeToMinutes,
     getScheduleTimeStatus,
+    getTodayName,
     getTodayRange,
     sortSchedulesByTime
 } = require("../utils/scheduleTime");
@@ -46,15 +47,17 @@ function teacherGetDateInputValue(date) {
 }
 
 function teacherGetStartOfDate(dateString) {
-    const date = dateString ? new Date(dateString + "T00:00:00") : new Date();
-    date.setHours(0, 0, 0, 0);
-    return date;
+    if (dateString) {
+        return new Date(dateString + "T00:00:00.000+05:30");
+    }
+    return getTodayRange().start;
 }
 
 function teacherGetEndOfDate(dateString) {
-    const date = dateString ? new Date(dateString + "T23:59:59.999") : new Date();
-    date.setHours(23, 59, 59, 999);
-    return date;
+    if (dateString) {
+        return new Date(dateString + "T23:59:59.999+05:30");
+    }
+    return getTodayRange().end;
 }
 
 function teacherGetDayNameFromDate(date) {
@@ -150,19 +153,7 @@ function isTeacher(req, res, next) {
     next();
 }
 
-function getTodayName() {
-    const days = [
-        "Sunday",
-        "Monday",
-        "Tuesday",
-        "Wednesday",
-        "Thursday",
-        "Friday",
-        "Saturday"
-    ];
-
-    return days[new Date().getDay()];
-}
+// getTodayName is imported from utils/scheduleTime.js
 
 function getErrorMessage(errorCode) {
         
@@ -350,11 +341,8 @@ function getScheduleDateTimeForToday(timeText) {
         return null;
     }
 
-    const date = new Date();
-    date.setHours(0, 0, 0, 0);
-    date.setMinutes(minutes);
-
-    return date;
+    const date = getTodayRange().start;
+    return new Date(date.getTime() + (minutes * 60000));
 }
 
 function isScheduleAlreadyManuallyRecorded(session) {

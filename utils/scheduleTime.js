@@ -123,16 +123,38 @@ function sortSchedulesByDayAndTime(schedules) {
     return schedules;
 }
 
+function getTodayName() {
+    const formatter = new Intl.DateTimeFormat('en-US', {
+        weekday: 'long',
+        timeZone: 'Asia/Kolkata'
+    });
+    return formatter.format(new Date());
+}
+
 function getTodayRange() {
-    const start = new Date();
-    start.setHours(0, 0, 0, 0);
-
-    const end = new Date();
-    end.setHours(23, 59, 59, 999);
-
+    const now = new Date();
+    
+    const formatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Asia/Kolkata',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+    });
+    
+    const parts = formatter.formatToParts(now);
+    const dateObj = {};
+    for (let i = 0; i < parts.length; i++) {
+        if (parts[i].type !== 'literal') {
+            dateObj[parts[i].type] = parts[i].value;
+        }
+    }
+    
+    const startIso = dateObj.year + "-" + dateObj.month + "-" + dateObj.day + "T00:00:00.000+05:30";
+    const endIso = dateObj.year + "-" + dateObj.month + "-" + dateObj.day + "T23:59:59.999+05:30";
+    
     return {
-        start: start,
-        end: end
+        start: new Date(startIso),
+        end: new Date(endIso)
     };
 }
 
@@ -149,7 +171,26 @@ function getScheduleTimeStatus(startTime, endTime, currentDate) {
     }
 
     const now = currentDate || new Date();
-    const currentMinutes = now.getHours() * 60 + now.getMinutes();
+    
+    const formatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Asia/Kolkata',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+    });
+    
+    const parts = formatter.formatToParts(now);
+    let hour = 0;
+    let minute = 0;
+    
+    for (let i = 0; i < parts.length; i++) {
+        if (parts[i].type === 'hour') hour = parseInt(parts[i].value, 10);
+        if (parts[i].type === 'minute') minute = parseInt(parts[i].value, 10);
+    }
+    
+    if (hour === 24) hour = 0;
+
+    const currentMinutes = (hour * 60) + minute;
 
     if (currentMinutes < startMinutes) {
         return "upcoming";
@@ -166,6 +207,7 @@ module.exports = {
     timeToMinutes,
     sortSchedulesByTime,
     sortSchedulesByDayAndTime,
+    getTodayName,
     getTodayRange,
     getScheduleTimeStatus
 };

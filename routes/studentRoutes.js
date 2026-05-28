@@ -11,7 +11,7 @@ const AttendanceAttempt = require("../models/attendanceAttemptSchema");
 const Schedule = require("../models/scheduleSchema");
 const PasskeySetupRequest = require("../models/passkeySetupRequestSchema");
 
-const { sortSchedulesByTime } = require("../utils/scheduleTime");
+const { sortSchedulesByTime, getTodayName, getTodayRange } = require("../utils/scheduleTime");
 const {
     evaluateLocationRange,
     getLocationDecisionMessage,
@@ -61,32 +61,7 @@ function isStudent(req, res, next) {
     next();
 }
 
-function getTodayName() {
-    const days = [
-        "Sunday",
-        "Monday",
-        "Tuesday",
-        "Wednesday",
-        "Thursday",
-        "Friday",
-        "Saturday"
-    ];
-
-    return days[new Date().getDay()];
-}
-
-function getTodayRange() {
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
-
-    const todayEnd = new Date();
-    todayEnd.setHours(23, 59, 59, 999);
-
-    return {
-        start: todayStart,
-        end: todayEnd
-    };
-}
+// getTodayName and getTodayRange are imported from utils/scheduleTime.js
 
 function getId(value) {
     if (!value) {
@@ -171,10 +146,8 @@ function getScheduleStartDateTime(session) {
         return session.startTime ? new Date(session.startTime) : null;
     }
 
-    const date = session.startTime ? new Date(session.startTime) : new Date();
-    date.setHours(0, 0, 0, 0);
-    date.setMinutes(minutes);
-    return date;
+    const date = getTodayRange().start;
+    return new Date(date.getTime() + (minutes * 60000));
 }
 
 function getAttendanceStatusForMark(session, markedAt) {
@@ -307,15 +280,17 @@ function studentGetMonthStartInputValue() {
 }
 
 function studentGetStartOfDate(dateString) {
-    const date = dateString ? new Date(dateString + "T00:00:00") : new Date();
-    date.setHours(0, 0, 0, 0);
-    return date;
+    if (dateString) {
+        return new Date(dateString + "T00:00:00.000+05:30");
+    }
+    return getTodayRange().start;
 }
 
 function studentGetEndOfDate(dateString) {
-    const date = dateString ? new Date(dateString + "T23:59:59.999") : new Date();
-    date.setHours(23, 59, 59, 999);
-    return date;
+    if (dateString) {
+        return new Date(dateString + "T23:59:59.999+05:30");
+    }
+    return getTodayRange().end;
 }
 
 function studentGetPercent(part, total) {
