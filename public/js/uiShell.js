@@ -222,6 +222,15 @@
         bestLink.classList.add("active");
     }
 
+    function initializeUiShell() {
+        const role = getRealtimeRoleFromPath();
+
+        installShell();
+        installRealtime();
+        wrapSelects();
+        enableFileInputs();
+    }
+
     function installShell() {
         if (document.documentElement.dataset.uiShellInstalled === "true") {
             return;
