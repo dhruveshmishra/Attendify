@@ -6,7 +6,7 @@ Attendify is a geo-location based attendance management system for colleges. It 
 
 ## System Overview
 
-![Attendify - Complete System Workflow](https://github.com/harshkolicool/Attendify/assets/your-username/your-image-id.png)
+![Attendify - Complete System Workflow](https://res.cloudinary.com/dh7v60nrt/image/upload/v1780024226/ChatGPT_Image_May_28_2026_04_12_26_PM_sliqt2.png)
 
 ---
 
