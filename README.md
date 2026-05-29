@@ -1,6 +1,12 @@
 # Attendify
 
-Attendify is a geo-location based attendance management system for colleges. It allows teachers to start attendance sessions and students to mark attendance from their own device using passkey/trusted browser verification and browser GPS location.
+Attendify is a geo-location based attendance management system for colleges. It allows teachers to start attendance sessions and students to mark attendance from their own device using passkey/trusted browser authentication, verified by real-time geo-location.
+
+---
+
+## System Overview
+
+![Attendify - Complete System Workflow](https://github.com/harshkolicool/Attendify/assets/your-username/your-image-id.png)
 
 ---
 
@@ -265,7 +271,7 @@ Attendify includes:
 Attendify supports multiple deployment modes depending on your realtime needs. The app uses `REALTIME_MODE` environment variable.
 
 - **`socket` mode**: Best for VPS (EC2, DigitalOcean) or persistent services (Render, Railway). It uses true WebSockets for instant, low-latency live map and dashboard updates.
-- **`polling` mode**: Best for serverless environments (Vercel, Netlify). The frontend automatically switches to fetching data every few seconds, ensuring realtime-like functionality without dropping persistent WebSocket connections.
+- **`polling` mode**: Best for serverless environments (Vercel, Netlify). The frontend automatically switches to fetching data every few seconds, ensuring realtime-like functionality without drop.
 - **`auto` mode**: Automatically uses `polling` on Vercel and `socket` elsewhere.
 
 For a production-grade deployment on Vercel, it is highly recommended to set `REALTIME_MODE=polling`.
@@ -299,19 +305,19 @@ When they click it, a strict multi-layered verification process occurs:
 To ensure the student isn't marking attendance for a friend, they must prove their identity using a physical device factor:
 
 **Option 1: Passkeys (WebAuthn)**
-- **How it works:** Passkeys use public-key cryptography. When a student registers a passkey, their device generates a private/public key pair. The private key never leaves the device's secure enclave (like Apple FaceID, Windows Hello, or Android Fingerprint).
-- **During Attendance:** The server sends a cryptographic "challenge". The student's device prompts them for their fingerprint or Face ID. If successful, the device signs the challenge with the private key. The server validates the signature.
+- **How it works:** Passkeys use public-key cryptography. When a student registers a passkey, their device generates a private/public key pair. The private key never leaves the device's secure en.
+- **During Attendance:** The server sends a cryptographic "challenge". The student's device prompts them for their fingerprint or Face ID. If successful, the device signs the challenge with the p.
 
 **Option 2: Trusted Browser (Fallback)**
 - **How it works:** If a student's device is old and doesn't support Passkeys, the Admin can allow "Trusted Browser" setup.
-- **During Attendance:** The student enters their account password to "Trust" the specific browser they are using. The server generates a unique encrypted device token and stores it as an HttpOnly Cookie. During attendance, the server validates this cookie. It prevents students from sharing their credentials because the other person's browser won't have the trusted token.
+- **During Attendance:** The student enters their account password to "Trust" the specific browser they are using. The server generates a unique encrypted device token and stores it as an HttpOnl.
 
 #### Layer B: Geolocation Verification
 Once identity is confirmed, the system must verify the student is physically in the classroom.
 - **How it works:** The frontend uses the HTML5 Geolocation API (`navigator.geolocation.watchPosition`) to capture the student's exact GPS coordinates (Latitude, Longitude, and Accuracy).
-- **Advanced Filtering:** The system collects up to 16 samples over 25 seconds, filtering out speed-based outliers and wild inaccurate readings. It then calculates a weighted average for the highest confidence.
-- **Server-Side Validation:** The frontend sends this data to the backend. The backend calculates the Haversine distance between the Student's coordinates and the Teacher's coordinates (from Step 2).
-- **Grace Allowances:** The backend accounts for GPS inaccuracy. If the calculated distance minus the GPS inaccuracy margin is strictly less than the Classroom's allowed radius, the backend accepts the attempt.
+- **Advanced Filtering:** The system collects up to 16 samples over 25 seconds, filtering out speed-based outliers and wild inaccurate readings. It then calculates a weighted average for the high.
+- **Server-Side Validation:** The frontend sends this data to the backend. The backend calculates the Haversine distance between the Student's coordinates and the Teacher's coordinates (from Step.
+- **Grace Allowances:** The backend accounts for GPS inaccuracy. If the calculated distance minus the GPS inaccuracy margin is strictly less than the Classroom's allowed radius, the backend accep.
 
 ### 4. Finalizing Records
 - If all checks pass, an `AttendanceRecord` is created with a `PRESENT` status.
