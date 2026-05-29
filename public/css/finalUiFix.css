@@ -1464,3 +1464,15 @@ svg {
         font-size: 14px !important;
     }
 }
+
+/* Fix for Hamburger menu overlapping header text on mobile */
+@media (max-width: 1280px) {
+    .teacher-header,
+    .dashboard-head,
+    .admin-header,
+    .student-header,
+    .platform-header,
+    .student-history-card-head {
+        margin-top: calc(72px + env(safe-area-inset-top, 0px)) !important;
+    }
+}
